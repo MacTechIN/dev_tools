@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dev_tools 전체 프로세스도</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1c2330;
+    --muted: #5b6676;
+    --line: #d5dae2;
+    --lane-a: #fbfcfd;
+    --lane-b: #f1f4f8;
+    --human: #fff1dc;
+    --human-b: #d98a1f;
+    --dash: #e2f0ff;
+    --dash-b: #2f7fd1;
+    --sys: #e7f6ec;
+    --sys-b: #2f9a57;
+    --tool: #efe9fb;
+    --tool-b: #7a55c7;
+    --arrow: #4a5568;
+    --alt: #c2452f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161d;
+      --panel: #1a2029;
+      --text: #e6eaf0;
+      --muted: #9aa5b5;
+      --line: #313a48;
+      --lane-a: #1a2029;
+      --lane-b: #1f2631;
+      --human: #46351a;
+      --human-b: #e0a04a;
+      --dash: #1b3550;
+      --dash-b: #62a8ec;
+      --sys: #1c3a28;
+      --sys-b: #58c07f;
+      --tool: #2e2648;
+      --tool-b: #a88be6;
+      --arrow: #b3bdcc;
+      --alt: #ef7d68;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  main { max-width: 1280px; margin: 0 auto; padding: 32px 16px 56px; }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  h2 { font-size: 18px; margin: 36px 0 12px; }
+  p.lead { margin: 0 0 20px; color: var(--muted); max-width: 70ch; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .scroll { overflow-x: auto; }
+  svg { display: block; min-width: 960px; width: 100%; height: auto; }
+  .lane-a { fill: var(--lane-a); }
+  .lane-b { fill: var(--lane-b); }
+  .lane-line { stroke: var(--line); stroke-width: 1; }
+  .lane-title { font-size: 13.5px; font-weight: 700; fill: var(--text); }
+  .lane-sub { font-size: 11.5px; fill: var(--muted); }
+  .box { stroke-width: 1.6; }
+  .b-human { fill: var(--human); stroke: var(--human-b); }
+  .b-dash { fill: var(--dash); stroke: var(--dash-b); }
+  .b-sys { fill: var(--sys); stroke: var(--sys-b); }
+  .b-tool { fill: var(--tool); stroke: var(--tool-b); }
+  .t { font-size: 13px; fill: var(--text); text-anchor: middle; }
+  .n { font-size: 11.5px; font-weight: 700; fill: var(--panel); text-anchor: middle; }
+  .nc-human { fill: var(--human-b); }
+  .nc-dash { fill: var(--dash-b); }
+  .nc-sys { fill: var(--sys-b); }
+  .nc-tool { fill: var(--tool-b); }
+  .flow { fill: none; stroke: var(--arrow); stroke-width: 1.8; }
+  .alt { fill: none; stroke: var(--alt); stroke-width: 1.6; stroke-dasharray: 6 4; }
+  .head { fill: var(--arrow); }
+  .head-alt { fill: var(--alt); }
+  .label { font-size: 12px; fill: var(--arrow); text-anchor: middle; font-weight: 600; }
+  .label-alt { font-size: 12px; fill: var(--alt); text-anchor: middle; font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 14px; height: 14px; border-radius: 4px; border: 1.6px solid; display: inline-block; }
+  .sw.human { background: var(--human); border-color: var(--human-b); }
+  .sw.dash { background: var(--dash); border-color: var(--dash-b); }
+  .sw.sys { background: var(--sys); border-color: var(--sys-b); }
+  .sw.tool { background: var(--tool); border-color: var(--tool-b); }
+  .ln { width: 26px; height: 0; border-top: 2px solid var(--arrow); display: inline-block; }
+  .ln.alt-ln { border-top: 2px dashed var(--alt); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  td.num { font-weight: 700; width: 44px; }
+  td.who { white-space: nowrap; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1.4px solid; font-size: 12.5px; }
+  .tag.human { background: var(--human); border-color: var(--human-b); }
+  .tag.dash { background: var(--dash); border-color: var(--dash-b); }
+  .tag.sys { background: var(--sys); border-color: var(--sys-b); }
+  .tag.tool { background: var(--tool); border-color: var(--tool-b); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  footer { margin-top: 28px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>dev_tools 전체 프로세스도</h1>
+  <p class="lead">여러 개발자가 각자 AI 개발툴을 쓰며 한 프로젝트를 만들 때의 흐름입니다. AI는 빠진 부분(갭)을 찾아 보여 주고, 무엇을 맡을지와 완료 승인은 사람이 결정합니다.</p>
+
+  <div class="panel">
+    <div class="scroll">
+      <svg viewBox="0 0 1230 660" role="img" aria-labelledby="svgTitle svgDesc">
+        <title id="svgTitle">dev_tools 프로세스 스윔레인 다이어그램</title>
+        <desc id="svgDesc">사람, Dev_Dashboard, dev_tools 서버, AI 개발툴과 저장소 네 주체 사이에서 요구사항 작성부터 갭 탐지, claim, 구현, 완료 승인까지 12단계가 이어지고 다음 갭으로 반복된다.</desc>
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path class="head" d="M0,0 L10,5 L0,10 z"/>
+          </marker>
+          <marker id="ah-alt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path class="head-alt" d="M0,0 L10,5 L0,10 z"/>
+          </marker>
+        </defs>
+
+        <!-- lanes -->
+        <rect class="lane-a" x="0" y="40" width="1230" height="150"/>
+        <rect class="lane-b" x="0" y="190" width="1230" height="150"/>
+        <rect class="lane-a" x="0" y="340" width="1230" height="150"/>
+        <rect class="lane-b" x="0" y="490" width="1230" height="150"/>
+        <line class="lane-line" x1="0" y1="40" x2="1230" y2="40"/>
+        <line class="lane-line" x1="0" y1="190" x2="1230" y2="190"/>
+        <line class="lane-line" x1="0" y1="340" x2="1230" y2="340"/>
+        <line class="lane-line" x1="0" y1="490" x2="1230" y2="490"/>
+        <line class="lane-line" x1="0" y1="640" x2="1230" y2="640"/>
+        <line class="lane-line" x1="150" y1="40" x2="150" y2="640"/>
+
+        <text class="lane-title" x="16" y="112">사람</text>
+        <text class="lane-sub" x="16" y="131">개발자 · 결정 주체</text>
+        <text class="lane-title" x="16" y="262">Dev_Dashboard</text>
+        <text class="lane-sub" x="16" y="281">실시간 화면</text>
+        <text class="lane-title" x="16" y="412">dev_tools 서버</text>
+        <text class="lane-sub" x="16" y="431">수집 · 탐지 · 기록</text>
+        <text class="lane-title" x="16" y="562">AI 개발툴 · 저장소</text>
+        <text class="lane-sub" x="16" y="581">Codex, Claude, KIMI 등</text>
+
+        <!-- main flow -->
+        <path class="flow" marker-end="url(#ah)" d="M245,145 V385"/>
+        <path class="flow" marker-end="url(#ah)" d="M320,415 H348"/>
+        <path class="flow" marker-end="url(#ah)" d="M393,535 V445"/>
+        <path class="flow" marker-end="url(#ah)" d="M423,385 V295"/>
+        <path class="flow" marker-end="url(#ah)" d="M498,265 H601 V145"/>
+        <path class="flow" marker-end="url(#ah)" d="M676,115 H779 V235"/>
+        <path class="flow" marker-end="url(#ah)" d="M779,295 V385"/>
+        <path class="flow" marker-end="url(#ah)" d="M854,415 H957 V535"/>
+        <path class="flow" marker-end="url(#ah)" d="M1032,565 H1135 V445"/>
+        <path class="flow" marker-end="url(#ah)" d="M1135,385 V295"/>
+        <path class="flow" marker-end="url(#ah)" d="M1135,235 V145"/>
+        <!-- loop -->
+        <path class="flow" marker-end="url(#ah)" d="M1135,85 V62 H601 V85"/>
+        <text class="label" x="868" y="55">끝나면 다음 갭으로 반복</text>
+
+        <!-- alternate flows -->
+        <path class="alt" marker-end="url(#ah-alt)" d="M779,445 V472 H453 V445"/>
+        <text class="label-alt" x="616" y="465">Claim 만료 시 갭으로 복귀</text>
+        <path class="alt" marker-end="url(#ah-alt)" d="M882,565 H498"/>
+        <text class="label-alt" x="690" y="556">작업 중 활동도 계속 수집</text>
+
+        <!-- boxes: lane 1 (human) -->
+        <rect class="box b-human" x="170" y="85" width="150" height="60" rx="8"/>
+        <text class="t" x="245" y="111">요구사항·스펙</text>
+        <text class="t" x="245" y="129">작성</text>
+        <circle class="nc-human" cx="176" cy="89" r="11"/><text class="n" x="176" y="93">1</text>
+
+        <rect class="box b-human" x="526" y="85" width="150" height="60" rx="8"/>
+        <text class="t" x="601" y="111">갭 확인,</text>
+        <text class="t" x="601" y="129">맡을 작업 결정</text>
+        <circle class="nc-human" cx="532" cy="89" r="11"/><text class="n" x="532" y="93">6</text>
+
+        <rect class="box b-human" x="1060" y="85" width="150" height="60" rx="8"/>
+        <text class="t" x="1135" y="111">완료 승인,</text>
+        <text class="t" x="1135" y="129">다음 갭 선택</text>
+        <circle class="nc-human" cx="1066" cy="89" r="11"/><text class="n" x="1066" y="93">12</text>
+
+        <!-- lane 2 (dashboard) -->
+        <rect class="box b-dash" x="348" y="235" width="150" height="60" rx="8"/>
+        <text class="t" x="423" y="261">현황과 갭 후보</text>
+        <text class="t" x="423" y="279">실시간 표시</text>
+        <circle class="nc-dash" cx="354" cy="239" r="11"/><text class="n" x="354" y="243">5</text>
+
+        <rect class="box b-dash" x="704" y="235" width="150" height="60" rx="8"/>
+        <text class="t" x="779" y="270">Claim 등록</text>
+        <circle class="nc-dash" cx="710" cy="239" r="11"/><text class="n" x="710" y="243">7</text>
+
+        <rect class="box b-dash" x="1060" y="235" width="150" height="60" rx="8"/>
+        <text class="t" x="1135" y="261">완료 표시,</text>
+        <text class="t" x="1135" y="279">갭 목록 갱신</text>
+        <circle class="nc-dash" cx="1066" cy="239" r="11"/><text class="n" x="1066" y="243">11</text>
+
+        <!-- lane 3 (server) -->
+        <rect class="box b-sys" x="170" y="385" width="150" height="60" rx="8"/>
+        <text class="t" x="245" y="411">요구사항을</text>
+        <text class="t" x="245" y="429">작은 단위로 분해</text>
+        <circle class="nc-sys" cx="176" cy="389" r="11"/><text class="n" x="176" y="393">2</text>
+
+        <rect class="box b-sys" x="348" y="385" width="150" height="60" rx="8"/>
+        <text class="t" x="423" y="411">갭 탐지</text>
+        <text class="t" x="423" y="429">(검색 → AI 판정)</text>
+        <circle class="nc-sys" cx="354" cy="389" r="11"/><text class="n" x="354" y="393">4</text>
+
+        <rect class="box b-sys" x="704" y="385" width="150" height="60" rx="8"/>
+        <text class="t" x="779" y="411">Claim 기록</text>
+        <text class="t" x="779" y="429">(만료 관리)</text>
+        <circle class="nc-sys" cx="710" cy="389" r="11"/><text class="n" x="710" y="393">8</text>
+
+        <rect class="box b-sys" x="1060" y="385" width="150" height="60" rx="8"/>
+        <text class="t" x="1135" y="411">완료 검증</text>
+        <text class="t" x="1135" y="429">(테스트·리뷰)</text>
+        <circle class="nc-sys" cx="1066" cy="389" r="11"/><text class="n" x="1066" y="393">10</text>
+
+        <!-- lane 4 (tools) -->
+        <rect class="box b-tool" x="348" y="535" width="150" height="60" rx="8"/>
+        <text class="t" x="423" y="561">세션·git 활동</text>
+        <text class="t" x="423" y="579">자동 수집</text>
+        <circle class="nc-tool" cx="354" cy="539" r="11"/><text class="n" x="354" y="543">3</text>
+
+        <rect class="box b-tool" x="882" y="535" width="150" height="60" rx="8"/>
+        <text class="t" x="957" y="561">자기 AI 도구로</text>
+        <text class="t" x="957" y="579">구현</text>
+        <circle class="nc-tool" cx="888" cy="539" r="11"/><text class="n" x="888" y="543">9</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i class="sw human"></i>사람이 결정하는 단계</span>
+      <span><i class="sw dash"></i>대시보드</span>
+      <span><i class="sw sys"></i>dev_tools 서버</span>
+      <span><i class="sw tool"></i>AI 개발툴 · 저장소</span>
+      <span><i class="ln"></i>기본 흐름</span>
+      <span><i class="ln alt-ln"></i>예외 · 상시 흐름</span>
+    </div>
+  </div>
+
+  <h2>단계별 설명</h2>
+  <div class="panel scroll">
+    <table>
+      <thead><tr><th>단계</th><th>주체</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td class="who"><span class="tag human">사람</span></td><td>요구사항·스펙을 작성한다. 갭 탐지의 기준이 된다.</td></tr>
+        <tr><td class="num">2</td><td class="who"><span class="tag sys">서버</span></td><td>요구사항을 작고 검사 가능한 단위로 나눈다.</td></tr>
+        <tr><td class="num">3</td><td class="who"><span class="tag tool">AI 개발툴</span></td><td>각 개발자의 세션 활동과 git 변경을 자동으로 보낸다. 개발자가 따로 보고하지 않는다.</td></tr>
+        <tr><td class="num">4</td><td class="who"><span class="tag sys">서버</span></td><td>요구사항마다 관련 코드를 검색하고 AI가 "구현됨 / 부분 구현 / 없음"을 근거와 함께 판정한다.</td></tr>
+        <tr><td class="num">5</td><td class="who"><span class="tag dash">대시보드</span></td><td>팀 현황, 갭 후보, 활동 피드, 파일 겹침 경고를 실시간으로 보여 준다.</td></tr>
+        <tr><td class="num">6</td><td class="who"><span class="tag human">사람</span></td><td>갭 후보를 확인해 확정하거나 기각하고, 자기가 맡을 작업을 정한다.</td></tr>
+        <tr><td class="num">7</td><td class="who"><span class="tag dash">대시보드</span></td><td>맡을 갭에 claim을 등록한다.</td></tr>
+        <tr><td class="num">8</td><td class="who"><span class="tag sys">서버</span></td><td>담당자와 상태를 한 번에 기록한다. 한 갭은 한 사람만 맡을 수 있고, 활동이 끊기면 만료된다.</td></tr>
+        <tr><td class="num">9</td><td class="who"><span class="tag tool">AI 개발툴</span></td><td>개발자가 자기 AI 개발툴로 구현한다. 작업 공간은 개발자별로 분리한다.</td></tr>
+        <tr><td class="num">10</td><td class="who"><span class="tag sys">서버</span></td><td>테스트 결과와 리뷰 상태로 완료를 검증한다.</td></tr>
+        <tr><td class="num">11</td><td class="who"><span class="tag dash">대시보드</span></td><td>완료를 표시하고 갭 목록을 갱신한다.</td></tr>
+        <tr><td class="num">12</td><td class="who"><span class="tag human">사람</span></td><td>완료를 승인하고 다음 갭을 고른다. 6단계로 돌아가 반복한다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>예외 흐름</h2>
+  <div class="grid">
+    <div class="panel card">
+      <h3>Claim 만료</h3>
+      <p>맡은 뒤 일정 시간 활동이 없으면 claim이 풀리고 갭 목록으로 돌아간다. 방치된 작업이 다른 사람을 막지 않게 한다.</p>
+    </div>
+    <div class="panel card">
+      <h3>오탐 기각</h3>
+      <p>AI가 구현된 부분을 갭으로 잘못 판정할 수 있다. 사람이 6단계에서 기각하면 목록에서 빠지고, 기각 기록은 판정 정확도를 재는 데 쓴다.</p>
+    </div>
+    <div class="panel card">
+      <h3>작업 겹침 경고</h3>
+      <p>서로 다른 개발자의 작업이 같은 파일에 겹치면 커밋 전에 대시보드에 경고가 뜬다.</p>
+    </div>
+  </div>
+
+  <footer>근거: <code>dev_tools_definition.md</code>, <code>research.md</code> · 초안 2026-11-20 · 구현 기술은 미정이며 이 그림은 흐름만 나타낸다.</footer>
+</main>
+</body>
+</html>
