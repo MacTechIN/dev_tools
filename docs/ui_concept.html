@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dev_tools UI 개념도</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --soft: #f0f2f6;
+    --text: #1b2230;
+    --muted: #5d6878;
+    --line: #d6dbe3;
+    --accent: #2f6fd6;
+    --empty: #fff0d9;  --empty-b: #d5861a;
+    --doing: #e1efff;  --doing-b: #2f7fd1;
+    --check: #efe8fb;  --check-b: #7a55c7;
+    --done: #e4f5ea;   --done-b: #2c9655;
+    --warn: #fde8e4;   --warn-b: #c9412b;
+    --term-bg: #151a22; --term-text: #dbe3ee; --term-dim: #8a96a8; --term-ok: #6fd08f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11151b;
+      --panel: #1a2029;
+      --soft: #222a35;
+      --text: #e7ebf1;
+      --muted: #9ba6b6;
+      --line: #323b49;
+      --accent: #6aa5f2;
+      --empty: #47361b;  --empty-b: #e2a24c;
+      --doing: #1b3653;  --doing-b: #66aaee;
+      --check: #2f2749;  --check-b: #a98ce8;
+      --done: #1c3a28;   --done-b: #5cc383;
+      --warn: #48231d;   --warn-b: #f08471;
+      --term-bg: #0c1016;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    line-height: 1.65; font-size: 15.5px;
+  }
+  main { max-width: 1180px; margin: 0 auto; padding: 36px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  h2 { font-size: 21px; margin: 52px 0 6px; padding-top: 8px; }
+  h3 { font-size: 16.5px; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  .lead { color: var(--muted); max-width: 68ch; margin-bottom: 20px; }
+  .sub { color: var(--muted); max-width: 72ch; margin-bottom: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .grid { display: grid; gap: 12px; }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .g5 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .big { font-size: 15px; font-weight: 700; color: var(--accent); margin-bottom: 2px; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+  nav.toc a { font-size: 13.5px; color: var(--text); text-decoration: none; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 12px; }
+  .scroll { overflow-x: auto; }
+
+  /* 세 가지 약속 */
+  .promise { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .promise .panel { border-left: 5px solid var(--accent); }
+  .promise b { display: block; font-size: 17px; margin-bottom: 4px; }
+
+  /* 화면 지도 */
+  svg { display: block; width: 100%; min-width: 820px; height: auto; }
+  .node { fill: var(--panel); stroke: var(--accent); stroke-width: 1.8; }
+  .node-side { fill: var(--soft); stroke: var(--line); stroke-width: 1.4; }
+  .nt { font-size: 14px; font-weight: 700; fill: var(--text); text-anchor: middle; }
+  .ns { font-size: 11.5px; fill: var(--muted); text-anchor: middle; }
+  .edge { fill: none; stroke: var(--muted); stroke-width: 1.7; }
+  .eh { fill: var(--muted); }
+  .el { font-size: 12px; fill: var(--muted); text-anchor: middle; font-weight: 600; }
+  .group { fill: none; stroke: var(--line); stroke-dasharray: 5 4; }
+
+  /* 화면 예시 */
+  .screen { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 12px; }
+  @media (max-width: 900px) { .screen { grid-template-columns: 1fr; } }
+  .mock { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+  .mock-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--soft); border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: inline-block; }
+  .mock-in { min-width: 600px; display: grid; grid-template-columns: 118px 1fr; }
+  .side { border-right: 1px solid var(--line); padding: 12px 8px; font-size: 13px; }
+  .side div { padding: 6px 8px; border-radius: 7px; color: var(--muted); }
+  .side div.on { background: var(--doing); color: var(--text); font-weight: 700; }
+  .side .proj { font-weight: 700; color: var(--text); padding-bottom: 10px; }
+  .body { padding: 14px; font-size: 13.5px; }
+  .body h4 { margin: 14px 0 6px; font-size: 13.5px; }
+  .body h4:first-child { margin-top: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .tile { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; }
+  .tile .v { font-size: 22px; font-weight: 800; line-height: 1.2; }
+  .tile .k { font-size: 12px; color: var(--muted); }
+  .bar { height: 6px; border-radius: 3px; background: var(--soft); margin-top: 5px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--done-b); }
+  .row { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; margin-bottom: 6px; }
+  .row .grow { flex: 1; min-width: 0; }
+  .row small, .kcard small, .body small { color: var(--muted); font-size: 12px; }
+  .av { width: 26px; height: 26px; border-radius: 50%; background: var(--soft); border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex: none; }
+  .chip { display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; border: 1.3px solid; white-space: nowrap; }
+  .c-empty { background: var(--empty); border-color: var(--empty-b); }
+  .c-doing { background: var(--doing); border-color: var(--doing-b); }
+  .c-check { background: var(--check); border-color: var(--check-b); }
+  .c-done { background: var(--done); border-color: var(--done-b); }
+  .c-warn { background: var(--warn); border-color: var(--warn-b); }
+  .c-plain { background: var(--soft); border-color: var(--line); color: var(--muted); }
+  .btn { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 4px 11px; border-radius: 7px; background: var(--accent); color: #fff; white-space: nowrap; }
+  .btn.ghost { background: transparent; color: var(--text); border: 1.3px solid var(--line); font-weight: 600; }
+  .btn.off { background: var(--soft); color: var(--muted); }
+  .alert { border: 1.3px solid var(--warn-b); background: var(--warn); border-radius: 9px; padding: 7px 10px; margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+  .alert .grow { flex: 1; }
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .col { background: var(--soft); border-radius: 9px; padding: 8px; }
+  .col > b { display: block; font-size: 12.5px; margin-bottom: 6px; }
+  .kcard { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 6px; }
+  .kcard .t { font-weight: 700; display: block; margin-bottom: 3px; }
+  .kcard .btn { margin-top: 6px; }
+  .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+  .box { border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; margin-bottom: 8px; }
+  .ev { margin: 3px 0; }
+  .steps { display: flex; align-items: center; gap: 6px; margin: 8px 0 12px; flex-wrap: wrap; }
+  .st { padding: 3px 10px; border-radius: 999px; border: 1.3px solid var(--line); font-size: 12px; color: var(--muted); }
+  .st.ok { background: var(--done); border-color: var(--done-b); color: var(--text); }
+  .st.now { background: var(--doing); border-color: var(--doing-b); color: var(--text); font-weight: 700; }
+  .arrow { color: var(--muted); }
+  .pin { display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px; border-radius: 50%; background: var(--warn-b); color: #fff; font-size: 11.5px; font-weight: 800; margin-right: 4px; vertical-align: 1px; flex: none; }
+  .explain ol { list-style: none; margin: 0; padding: 0; }
+  .explain li { display: flex; gap: 8px; margin-bottom: 11px; font-size: 14.5px; }
+  .explain li b { display: block; }
+  .explain li span.txt { color: var(--muted); }
+  .why { border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 10px; font-size: 14px; color: var(--muted); }
+  .why b { color: var(--text); }
+  .map { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin: 4px 0 10px; }
+  .map i { display: block; aspect-ratio: 1; border-radius: 4px; border: 1.2px solid; }
+  .feed .row { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 6px 2px; margin: 0; }
+  .mock.scroll { overflow-x: auto; }
+  .mock-chat { min-width: 640px; display: grid; grid-template-columns: 104px minmax(0, 1fr) 228px; }
+  .chat { border-left: 1px solid var(--line); display: flex; flex-direction: column; font-size: 12.5px; background: var(--panel); }
+  .chat-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--line); font-weight: 700; }
+  .chat-pin { background: var(--empty); border-bottom: 1px solid var(--line); padding: 7px 10px; }
+  .chat-list { padding: 8px 10px; flex: 1; }
+  .msg { margin-bottom: 9px; }
+  .msg .who { font-weight: 700; }
+  .msg .bubble { background: var(--soft); border-radius: 9px; padding: 5px 8px; margin-top: 2px; }
+  .msg.me .bubble { background: var(--doing); }
+  .msg .attach { display: block; margin-top: 4px; border: 1px solid var(--line); background: var(--panel); border-radius: 7px; padding: 3px 7px; }
+  .chat-input { border-top: 1px solid var(--line); padding: 8px 10px; }
+  .chat-input .field { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; color: var(--muted); margin-bottom: 6px; }
+  .faded { opacity: .55; }
+  .fab { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: 13.5px; }
+  .fab .cnt { background: var(--warn-b); color: #fff; border-radius: 999px; padding: 0 7px; font-size: 12px; }
+  .node-chat { fill: var(--empty); stroke: var(--empty-b); stroke-width: 1.6; }
+  .term { background: var(--term-bg); color: var(--term-text); border-radius: 12px; padding: 14px 16px; font-family: ui-monospace, "D2Coding", Menlo, Consolas, monospace; font-size: 13px; line-height: 1.7; overflow-x: auto; white-space: pre; }
+  .term .me { color: #fff; font-weight: 700; }
+  .term .dim { color: var(--term-dim); }
+  .term .ok { color: var(--term-ok); }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .journey .panel { position: relative; }
+  .journey .n { font-size: 12.5px; font-weight: 800; color: var(--accent); }
+  .journey .time { font-size: 12.5px; color: var(--muted); }
+  footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>dev_tools UI 개념도</h1>
+  <p class="lead">여러 사람이 각자 AI 개발툴을 쓰면서 한 프로젝트를 함께 만들 때, 화면이 어떻게 생겨야 쉽고 헷갈리지 않게 일할 수 있는지를 그림과 쉬운 말로 정리했습니다. 실제 디자인이 아니라 "무엇을 어디에 놓을지"를 보여 주는 밑그림입니다.</p>
+
+  <div class="promise">
+    <div class="panel"><b>3초 안에 안다</b>지금 누가 무엇을 하고 있고, 어떤 일이 비어 있는지 첫 화면에서 바로 보입니다.</div>
+    <div class="panel"><b>한 번 눌러 맡는다</b>할 일을 고르고 "내가 맡기"를 누르면 끝입니다. 적어 넣을 것이 없습니다.</div>
+    <div class="panel"><b>보고는 자동이다</b>진행 상황은 AI 개발툴이 알아서 보내 줍니다. 사람이 따로 적지 않습니다.</div>
+  </div>
+
+  <nav class="toc">
+    <a href="#words">1. 쉬운 말</a>
+    <a href="#rules">2. 화면의 원칙</a>
+    <a href="#map">3. 화면 지도</a>
+    <a href="#home">4. 홈</a>
+    <a href="#find">5. 빈 곳 찾기</a>
+    <a href="#detail">6. 자세히 보기</a>
+    <a href="#mine">7. 내 작업</a>
+    <a href="#more">8. 활동 흐름 · 전체 지도</a>
+    <a href="#chat">9. 팀 대화방</a>
+    <a href="#tool">10. AI 도구 안에서</a>
+    <a href="#day">11. 하루의 흐름</a>
+    <a href="#color">12. 색과 알림</a>
+    <a href="#team">13. 로그인과 팀원</a>
+    <a href="#release">14. 출시와 전달</a>
+    <a href="#open">15. 정해야 할 것</a>
+  </nav>
+
+  <!-- 1 -->
+  <h2 id="words">1. 화면에서 쓰는 쉬운 말</h2>
+  <p class="sub">정의서의 용어는 처음 보는 사람에게 어렵습니다. 화면에서는 아래처럼 쉬운 말로 바꿔 씁니다. 이 문서도 지금부터 쉬운 말을 씁니다.</p>
+  <div class="panel scroll">
+    <table>
+      <thead><tr><th>정의서의 말</th><th>화면의 말</th><th>뜻</th></tr></thead>
+      <tbody>
+        <tr><td>갭</td><td><b>빈 곳</b></td><td>만들어야 하는데 아직 없거나, 맡은 사람이 없는 부분</td></tr>
+        <tr><td>갭 후보</td><td><b>AI가 찾은 빈 곳</b></td><td>AI가 "여기가 비어 있는 것 같다"고 알려 준 것. 틀릴 수 있어서 사람이 확인합니다</td></tr>
+        <tr><td>claim</td><td><b>맡기</b></td><td>"이 일은 내가 할게요"라고 표시하는 것</td></tr>
+        <tr><td>claim 만료</td><td><b>자동으로 풀림</b></td><td>맡아 놓고 오래 손대지 않으면 다른 사람이 맡을 수 있게 다시 비워지는 것</td></tr>
+        <tr><td>오탐 기각</td><td><b>"이미 있어요"</b></td><td>AI가 잘못 찾은 빈 곳을 목록에서 빼는 것</td></tr>
+        <tr><td>완료 검증</td><td><b>끝났는지 확인</b></td><td>테스트가 통과했는지 등을 살펴보는 것</td></tr>
+        <tr><td>세션</td><td><b>작업 중인 AI 도구</b></td><td>지금 켜 놓고 일을 시키고 있는 Codex, Claude, KIMI 등</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 2 -->
+  <h2 id="rules">2. 화면의 원칙</h2>
+  <p class="sub">화면을 만들 때 계속 지킬 여섯 가지입니다.</p>
+  <div class="grid g3">
+    <div class="panel card"><div class="big">하나</div><h3>한 화면에 할 일은 하나</h3><p>화면마다 가장 중요한 버튼은 하나만 눈에 띄게 둡니다. 홈에서는 "할 일 고르기", 자세히 보기에서는 "내가 맡을게요"입니다.</p></div>
+    <div class="panel card"><div class="big">둘</div><h3>결정은 사람이, 준비는 AI가</h3><p>AI는 빈 곳을 찾고 근거를 모아 둡니다. 맡을지, 끝났는지 정하는 버튼은 사람만 누릅니다.</p></div>
+    <div class="panel card"><div class="big">셋</div><h3>AI의 판단에는 항상 이유를</h3><p>"코드가 없어요"라고만 하지 않고, 어느 파일을 보고 그렇게 판단했는지 함께 보여 줍니다. 틀렸으면 한 번 눌러 고칠 수 있습니다.</p></div>
+    <div class="panel card"><div class="big">넷</div><h3>적어 넣게 하지 않는다</h3><p>진행 상황, 걸린 시간, 고친 파일은 자동으로 채워집니다. 사람이 글을 써야 하는 곳은 요구사항을 적을 때뿐입니다.</p></div>
+    <div class="panel card"><div class="big">다섯</div><h3>급한 것만 알린다</h3><p>모든 움직임을 알리면 아무도 보지 않게 됩니다. 같은 파일이 겹칠 때처럼 바로 알아야 하는 것만 알립니다.</p></div>
+    <div class="panel card"><div class="big">여섯</div><h3>색만으로 말하지 않는다</h3><p>상태는 색과 함께 글자로도 적습니다. 색을 구별하기 어려운 사람도 똑같이 읽을 수 있습니다.</p></div>
+  </div>
+
+  <!-- 3 -->
+  <h2 id="map">3. 화면 지도</h2>
+  <p class="sub">매일 쓰는 화면은 모두 다섯 개입니다. 가운데 줄이 일을 하는 큰 길이고, 아래 두 개는 필요할 때 들여다보는 화면입니다. 어느 화면이든 왼쪽 메뉴로 한 번에 갈 수 있습니다. 팀 대화방은 따로 떨어진 화면이 아니라, 모든 화면의 오른쪽 한켠에 늘 붙어 있습니다. 가끔 쓰는 "출시"와 "설정"은 왼쪽 메뉴의 아래쪽에 따로 둡니다(13장, 14장).</p>
+  <div class="panel">
+    <div class="scroll">
+      <svg viewBox="0 0 1000 330" role="img" aria-label="화면 지도: 홈에서 빈 곳 찾기, 자세히 보기, 내 작업으로 이어지고 끝나면 다시 빈 곳 찾기로 돌아간다. 활동 흐름과 전체 지도는 어디서든 갈 수 있다.">
+        <defs>
+          <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="eh" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <path class="edge" marker-end="url(#m)" d="M200,78 H262"/>
+        <path class="edge" marker-end="url(#m)" d="M430,78 H492"/>
+        <path class="edge" marker-end="url(#m)" d="M660,78 H722"/>
+        <text class="el" x="231" y="36">고르러 가기</text>
+        <text class="el" x="461" y="36">눌러 보기</text>
+        <text class="el" x="691" y="36">내가 맡기</text>
+        <path class="edge" marker-end="url(#m)" d="M806,108 V150 H346 V108"/>
+        <text class="el" x="576" y="170">끝나면 다음 일 고르기</text>
+
+        <rect class="node" x="32" y="48" width="168" height="60" rx="10"/>
+        <text class="nt" x="116" y="74">홈</text><text class="ns" x="116" y="92">지금 우리 팀</text>
+        <rect class="node" x="262" y="48" width="168" height="60" rx="10"/>
+        <text class="nt" x="346" y="74">빈 곳 찾기</text><text class="ns" x="346" y="92">할 일 고르기</text>
+        <rect class="node" x="492" y="48" width="168" height="60" rx="10"/>
+        <text class="nt" x="576" y="74">자세히 보기</text><text class="ns" x="576" y="92">AI의 이유 확인</text>
+        <rect class="node" x="722" y="48" width="168" height="60" rx="10"/>
+        <text class="nt" x="806" y="74">내 작업</text><text class="ns" x="806" y="92">하는 중 · 끝내기</text>
+
+        <rect class="group" x="232" y="212" width="536" height="96" rx="12"/>
+        <text class="el" x="500" y="232">왼쪽 메뉴로 어디서든 바로 가기</text>
+        <rect class="node-side" x="262" y="244" width="168" height="50" rx="10"/>
+        <text class="nt" x="346" y="266">활동 흐름</text><text class="ns" x="346" y="283">누가 방금 무엇을</text>
+        <rect class="node-side" x="570" y="244" width="168" height="50" rx="10"/>
+        <text class="nt" x="654" y="266">전체 지도</text><text class="ns" x="654" y="283">프로젝트가 얼마나 찼나</text>
+        <rect class="node-chat" x="812" y="238" width="168" height="62" rx="10"/>
+        <text class="nt" x="896" y="264">팀 대화방</text><text class="ns" x="896" y="282">모든 화면 한켠에 늘 있음</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <h2 id="home">4. 홈: 지금 우리 팀</h2>
+  <p class="sub">아침에 열면 가장 먼저 보는 화면입니다. "얼마나 됐지, 누가 뭘 하고 있지, 나는 뭘 하면 되지"에 답합니다.</p>
+  <div class="screen">
+    <div class="mock scroll">
+      <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp; dev_tools · 홈</div>
+      <div class="mock-in">
+        <div class="side">
+          <div class="proj">dev_tools</div>
+          <div class="on">홈</div><div>빈 곳 찾기</div><div>내 작업</div><div>활동 흐름</div><div>전체 지도</div>
+        </div>
+        <div class="body">
+          <h4><span class="pin">1</span>한눈에 보기</h4>
+          <div class="tiles">
+            <div class="tile"><div class="v">62%</div><div class="k">전체 진행</div><div class="bar"><i style="width:62%"></i></div></div>
+            <div class="tile"><div class="v">7</div><div class="k">비어 있는 일</div></div>
+            <div class="tile"><div class="v">4</div><div class="k">하고 있는 일</div></div>
+            <div class="tile"><div class="v">2</div><div class="k">확인이 필요한 일</div></div>
+          </div>
+
+          <h4><span class="pin">2</span>챙겨 볼 것</h4>
+          <div class="alert"><span class="grow"><b>같은 파일을 두 사람이 고치고 있어요.</b><br><small>민지 · 준호 → server/claims.ts</small></span><span class="btn ghost">같이 보기</span></div>
+          <div class="row"><span class="grow">서연 님이 맡은 "설치 명령 만들기"가 <b>20분 뒤 자동으로 풀려요.</b></span><span class="chip c-plain">곧 풀림</span></div>
+
+          <h4><span class="pin">3</span>지금 우리 팀</h4>
+          <div class="row"><span class="av">민</span><span class="grow"><b>민지</b> · 맡은 일이 멈추면 자동으로 풀기<br><small>Claude Code · 방금 전 · 파일 3개 고치는 중</small></span><span class="chip c-doing">만드는 중</span></div>
+          <div class="row"><span class="av">준</span><span class="grow"><b>준호</b> · 활동 흐름 화면<br><small>Codex · 2분 전 · 테스트 돌리는 중</small></span><span class="chip c-check">확인 중</span></div>
+          <div class="row"><span class="av">서</span><span class="grow"><b>서연</b> · 설치 명령 만들기<br><small>KIMI · 40분 전 마지막 활동 · 한마디: "3시까지 회의예요"</small></span><span class="chip c-plain">쉬는 중</span></div>
+
+          <h4><span class="pin">4</span>다음에 하면 좋은 일</h4>
+          <div class="row"><span class="grow"><b>빈 곳 목록에 급한 순서 표시하기</b><br><small>급함 · 3일째 비어 있음</small></span><span class="btn">내가 맡기</span></div>
+          <div class="row"><span class="grow"><b>Codex에서 활동 받아 오기</b><br><small>먼저 끝나야 하는 일 없음</small></span><span class="btn">내가 맡기</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel explain">
+      <ol>
+        <li><span class="pin">1</span><div><b>한눈에 보기</b><span class="txt">숫자 네 개로 프로젝트의 상태를 말해 줍니다. 숫자를 누르면 그 목록으로 바로 갑니다.</span></div></li>
+        <li><span class="pin">2</span><div><b>챙겨 볼 것</b><span class="txt">지금 손쓰지 않으면 문제가 되는 것만 올라옵니다. 아무 일 없으면 이 칸은 비어 있습니다.</span></div></li>
+        <li><span class="pin">3</span><div><b>지금 우리 팀</b><span class="txt">사람마다 한 줄입니다. 누가, 어떤 도구로, 어떤 일을, 언제 마지막으로 했는지가 자동으로 채워집니다. 자리를 비울 때는 "3시까지 회의예요" 같은 한마디를 남길 수 있고, 그 말이 내 줄에 함께 보입니다.</span></div></li>
+        <li><span class="pin">4</span><div><b>다음에 하면 좋은 일</b><span class="txt">급하고 오래 비어 있던 일이 위에 옵니다. 여기서 바로 맡을 수도 있습니다.</span></div></li>
+      </ol>
+      <div class="why"><b>왜 이렇게 했나요?</b> 팀원에게 "지금 뭐 해?"라고 묻지 않아도 되게 하려는 것입니다. 사람이 직접 적는 진행 보고는 실제와 다를 때가 많아서, 도구가 보내 준 사실만 보여 줍니다.</div>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <h2 id="find">5. 빈 곳 찾기: 할 일 고르기</h2>
+  <p class="sub">모든 일이 세 칸에 나뉘어 있습니다. 왼쪽 칸에서 골라 맡으면 가운데로, 끝나면 오른쪽으로 옮겨 갑니다. 카드를 직접 옮길 필요는 없습니다.</p>
+  <div class="screen">
+    <div class="mock scroll">
+      <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp; dev_tools · 빈 곳 찾기</div>
+      <div class="mock-in">
+        <div class="side">
+          <div class="proj">dev_tools</div>
+          <div>홈</div><div class="on">빈 곳 찾기</div><div>내 작업</div><div>활동 흐름</div><div>전체 지도</div>
+        </div>
+        <div class="body">
+          <div style="margin-bottom:10px"><span class="pin">1</span><span class="chip c-doing">전체</span> <span class="chip c-plain">급한 것</span> <span class="chip c-plain">오래 비어 있는 것</span> <span class="chip c-plain">바로 시작할 수 있는 것</span></div>
+          <div class="cols">
+            <div class="col">
+              <b><span class="pin">2</span>비어 있음 7</b>
+              <div class="kcard">
+                <span class="t">맡은 일이 멈추면 자동으로 풀기</span>
+                <span class="chip c-warn">급함</span> <span class="chip c-empty">일부만 있음</span><br>
+                <small><span class="pin">3</span>AI: 풀어 주는 코드가 없어요 · 확신 높음</small><br>
+                <span class="btn">내가 맡기</span>
+              </div>
+              <div class="kcard">
+                <span class="t">Codex에서 활동 받아 오기</span>
+                <span class="chip c-empty">아직 없음</span><br>
+                <small>AI: 관련 파일을 못 찾았어요 · 확신 보통</small><br>
+                <span class="btn">내가 맡기</span>
+              </div>
+              <div class="kcard">
+                <span class="t">팀원 초대하기</span>
+                <span class="chip c-plain">아직 못 함</span><br>
+                <small><span class="pin">4</span>"로그인"이 먼저 끝나야 해요</small>
+              </div>
+            </div>
+            <div class="col">
+              <b>하는 중 4</b>
+              <div class="kcard">
+                <span class="t">활동 흐름 화면</span>
+                <span class="chip c-check">확인 중</span><br>
+                <small><span class="pin">5</span>준호 · Codex · 2분 전</small>
+              </div>
+              <div class="kcard">
+                <span class="t">설치 명령 만들기</span>
+                <span class="chip c-plain">곧 풀림</span><br>
+                <small>서연 · KIMI · 40분 전</small>
+              </div>
+            </div>
+            <div class="col">
+              <b>끝남 12</b>
+              <div class="kcard">
+                <span class="t">활동 받는 주소 만들기</span>
+                <span class="chip c-done">끝남</span><br>
+                <small>민지 · 테스트 통과 · 준호 확인</small>
+              </div>
+              <div class="kcard">
+                <span class="t">한 사람만 맡게 하기</span>
+                <span class="chip c-done">끝남</span><br>
+                <small>준호 · 테스트 통과 · 민지 확인</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel explain">
+      <ol>
+        <li><span class="pin">1</span><div><b>골라 보기</b><span class="txt">버튼 하나로 급한 것, 오래 비어 있는 것, 지금 바로 시작할 수 있는 것만 볼 수 있습니다.</span></div></li>
+        <li><span class="pin">2</span><div><b>세 칸</b><span class="txt">비어 있음, 하는 중, 끝남. 칸 이름 옆의 숫자로 양을 바로 알 수 있습니다.</span></div></li>
+        <li><span class="pin">3</span><div><b>AI의 한 줄 이유</b><span class="txt">AI가 왜 비어 있다고 봤는지와 얼마나 확신하는지를 한 줄로 적습니다. 카드를 누르면 자세한 이유가 나옵니다.</span></div></li>
+        <li><span class="pin">4</span><div><b>아직 못 하는 일</b><span class="txt">다른 일이 먼저 끝나야 하면 "내가 맡기" 버튼 대신 그 이유를 보여 줍니다.</span></div></li>
+        <li><span class="pin">5</span><div><b>누가 하고 있는지</b><span class="txt">하는 중인 카드에는 사람, 도구, 마지막으로 움직인 때가 보입니다. 오래 멈춘 카드는 "곧 풀림"으로 바뀝니다.</span></div></li>
+      </ol>
+      <div class="why"><b>왜 이렇게 했나요?</b> 쉬운 일만 골라 가고 어려운 일이 계속 남는 것을 막기 위해, 급하고 오래된 일을 위로 올립니다. 이미 누가 맡은 일에는 맡기 버튼이 없어서 같은 일을 두 번 하는 실수가 생기지 않습니다.</div>
+    </div>
+  </div>
+
+  <!-- 6 -->
+  <h2 id="detail">6. 자세히 보기: AI의 이유 확인하고 정하기</h2>
+  <p class="sub">카드를 누르면 열립니다. AI가 찾은 빈 곳이 정말 비어 있는지 사람이 확인하고, 맡을지 정하는 화면입니다.</p>
+  <div class="screen">
+    <div class="mock scroll">
+      <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp; dev_tools · 맡은 일이 멈추면 자동으로 풀기</div>
+      <div class="mock-in">
+        <div class="side">
+          <div class="proj">dev_tools</div>
+          <div>홈</div><div class="on">빈 곳 찾기</div><div>내 작업</div><div>활동 흐름</div><div>전체 지도</div>
+        </div>
+        <div class="body">
+          <div class="two">
+            <div>
+              <div class="box">
+                <small><span class="pin">1</span>해야 하는 일 · 요구사항 23번</small><br>
+                <b>맡아 놓고 오래 손대지 않으면, 다른 사람이 맡을 수 있게 자동으로 풀린다.</b>
+              </div>
+              <div class="box">
+                <small><span class="pin">2</span>AI의 판단</small><br>
+                <b>일부만 만들어졌어요</b> <span class="chip c-plain">확신 높음</span>
+                <div class="ev">✓ 맡았다는 기록은 저장됩니다 <small>server/claims.ts 42~80줄</small></div>
+                <div class="ev">✗ 시간이 지나면 풀어 주는 코드가 없습니다</div>
+                <div class="ev">✗ 이 일과 이어진 테스트가 없습니다</div>
+              </div>
+              <div><span class="pin">3</span><span class="btn">맞아요, 내가 맡을게요</span> <span class="btn ghost">맞지만 지금은 안 맡아요</span> <span class="btn ghost">아니에요, 이미 있어요</span></div>
+            </div>
+            <div>
+              <div class="box">
+                <small><span class="pin">4</span>시작하기 전에</small>
+                <div class="ev">먼저 끝나야 하는 일<br><span class="chip c-done">끝남</span> 한 사람만 맡게 하기</div>
+                <div class="ev" style="margin-top:8px">고치게 될 것 같은 파일<br><small>server/claims.ts<br>server/jobs/</small></div>
+              </div>
+              <div class="alert" style="margin:0"><span class="grow"><small><span class="pin">5</span></small><b>민지 님이 지금 server/claims.ts를 고치고 있어요.</b></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel explain">
+      <ol>
+        <li><span class="pin">1</span><div><b>해야 하는 일</b><span class="txt">처음에 사람이 적어 둔 요구사항을 그대로 보여 줍니다. AI가 바꿔 쓴 말이 아닙니다.</span></div></li>
+        <li><span class="pin">2</span><div><b>AI의 판단과 이유</b><span class="txt">있는 것은 ✓, 없는 것은 ✗로 나눠 적고, 어느 파일의 몇 번째 줄을 봤는지 알려 줍니다. 누르면 그 코드가 열립니다.</span></div></li>
+        <li><span class="pin">3</span><div><b>세 가지 대답</b><span class="txt">맡거나, 빈 곳이 맞다고만 해 두거나, AI가 틀렸다고 알려 줍니다. "이미 있어요"를 누르면 목록에서 빠지고, AI가 얼마나 자주 틀리는지 세는 데 쓰입니다.</span></div></li>
+        <li><span class="pin">4</span><div><b>시작하기 전에</b><span class="txt">먼저 끝나야 하는 일이 끝났는지, 어떤 파일을 건드리게 될지 미리 보여 줍니다.</span></div></li>
+        <li><span class="pin">5</span><div><b>겹침 미리 알림</b><span class="txt">맡기 전에, 그 파일을 지금 다른 사람이 고치고 있으면 알려 줍니다. 서로 이야기하고 시작할 수 있습니다.</span></div></li>
+      </ol>
+      <div class="why"><b>왜 이렇게 했나요?</b> AI는 이미 만든 것을 "없다"고 잘못 말할 때가 있습니다. 그래서 AI의 말을 그대로 믿지 않고, 이유를 보고 사람이 정하게 했습니다.</div>
+    </div>
+  </div>
+
+  <!-- 7 -->
+  <h2 id="mine">7. 내 작업: 하는 중과 끝내기</h2>
+  <p class="sub">내가 맡은 일만 보이는 화면입니다. 일은 평소처럼 AI 개발툴에서 하고, 이 화면에는 그 내용이 자동으로 쌓입니다.</p>
+  <div class="screen">
+    <div class="mock scroll">
+      <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp; dev_tools · 내 작업</div>
+      <div class="mock-in">
+        <div class="side">
+          <div class="proj">dev_tools</div>
+          <div>홈</div><div>빈 곳 찾기</div><div class="on">내 작업</div><div>활동 흐름</div><div>전체 지도</div>
+        </div>
+        <div class="body">
+          <b>맡은 일이 멈추면 자동으로 풀기</b>
+          <div class="steps"><span class="pin">1</span><span class="st ok">✓ 맡음</span><span class="arrow">→</span><span class="st now">● 만드는 중</span><span class="arrow">→</span><span class="st">확인 중</span><span class="arrow">→</span><span class="st">끝남</span></div>
+          <div class="two">
+            <div>
+              <div class="box">
+                <small><span class="pin">2</span>내 AI 도구가 한 일 (자동 기록)</small>
+                <div class="ev"><small>14:02</small> server/claims.ts 고침</div>
+                <div class="ev"><small>14:05</small> 새 파일 server/jobs/expire.ts</div>
+                <div class="ev"><small>14:09</small> 테스트 실행 · 3개 중 2개 통과</div>
+              </div>
+              <div class="box">
+                <small><span class="pin">3</span>끝났는지 확인</small>
+                <div class="ev">✓ 풀어 주는 코드가 생겼어요</div>
+                <div class="ev">✗ 테스트 1개가 아직 실패해요</div>
+                <div class="ev">· 다른 사람의 확인을 기다려요</div>
+              </div>
+            </div>
+            <div>
+              <div class="box">
+                <small><span class="pin">4</span>남은 시간</small><br>
+                마지막 활동 <b>3분 전</b><br>
+                <small>57분 동안 움직임이 없으면 자동으로 풀려요.</small>
+              </div>
+              <div><span class="pin">5</span><span class="btn off">끝났어요, 확인해 주세요</span></div>
+              <div style="margin-top:6px"><small>테스트가 모두 통과하면 누를 수 있어요.</small></div>
+              <div style="margin-top:10px"><span class="btn ghost">못 하겠어요, 놓을게요</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel explain">
+      <ol>
+        <li><span class="pin">1</span><div><b>네 걸음</b><span class="txt">맡음, 만드는 중, 확인 중, 끝남. 지금 어디인지 한 줄로 보입니다. 걸음은 도구의 움직임을 보고 저절로 넘어갑니다.</span></div></li>
+        <li><span class="pin">2</span><div><b>자동 기록</b><span class="txt">AI 개발툴이 파일을 고치거나 테스트를 돌리면 여기에 쌓입니다. 내가 적는 것은 없습니다.</span></div></li>
+        <li><span class="pin">3</span><div><b>끝났는지 확인</b><span class="txt">무엇이 됐고 무엇이 남았는지 목록으로 보여 줍니다. 테스트 결과가 가장 믿을 만한 증거입니다.</span></div></li>
+        <li><span class="pin">4</span><div><b>남은 시간</b><span class="txt">언제 자동으로 풀리는지 미리 알려 줍니다. AI 개발툴을 계속 쓰고 있으면 시간은 저절로 늘어납니다.</span></div></li>
+        <li><span class="pin">5</span><div><b>끝내기와 놓기</b><span class="txt">조건이 채워지기 전에는 끝내기 버튼이 눌리지 않고, 왜 안 되는지 바로 아래에 적혀 있습니다. 못 하겠으면 놓을 수 있고, 그 일은 다시 빈 곳이 됩니다.</span></div></li>
+      </ol>
+      <div class="why"><b>왜 이렇게 했나요?</b> AI 개발툴은 덜 끝난 일을 "다 했다"고 말할 때가 있습니다. 그래서 끝났다는 말보다 테스트 결과를 먼저 보여 주고, 마지막 확인은 사람이 합니다.</div>
+    </div>
+  </div>
+
+  <!-- 8 -->
+  <h2 id="more">8. 활동 흐름과 전체 지도</h2>
+  <p class="sub">매일 쓰는 화면은 아니고, 궁금할 때 들여다보는 화면입니다.</p>
+  <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 12px;">
+    <div>
+      <div class="mock">
+        <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp; 활동 흐름</div>
+        <div class="body feed">
+          <div class="row"><span class="av">민</span><span class="grow">테스트를 돌렸어요 · 3개 중 2개 통과<br><small>방금 전 · Claude Code</small></span></div>
+          <div class="row"><span class="av">준</span><span class="grow">"활동 흐름 화면"을 확인해 달라고 했어요<br><small>2분 전 · Codex</small></span></div>
+          <div class="row"><span class="av">민</span><span class="grow">"맡은 일이 멈추면 자동으로 풀기"를 맡았어요<br><small>12분 전</small></span></div>
+          <div class="row"><span class="av">AI</span><span class="grow">빈 곳 2개를 새로 찾았어요<br><small>30분 전</small></span></div>
+          <div class="row" style="border:0"><span class="av">서</span><span class="grow">"로그인"을 끝냈어요 · 준호 확인<br><small>1시간 전 · KIMI</small></span></div>
+        </div>
+      </div>
+      <p class="sub" style="margin-top:10px"><b>활동 흐름</b>은 방금 일어난 일을 시간 순서로 보여 줍니다. 파일 하나하나의 움직임이 아니라 "맡았다, 끝냈다, 테스트를 돌렸다" 같은 굵직한 일만 올립니다. AI 개발툴은 아주 빠르게 움직여서 전부 보여 주면 읽을 수 없기 때문입니다.</p>
+    </div>
+    <div>
+      <div class="mock">
+        <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp; 전체 지도</div>
+        <div class="body">
+          <small>활동 받아 오기 · 10개 중 7개 끝남</small>
+          <div class="map">
+            <i class="c-done"></i><i class="c-done"></i><i class="c-done"></i><i class="c-done"></i><i class="c-done"></i><i class="c-done"></i><i class="c-done"></i><i class="c-check"></i><i class="c-empty"></i><i class="c-empty"></i>
+          </div>
+          <small>맡기 · 10개 중 4개 끝남</small>
+          <div class="map">
+            <i class="c-done"></i><i class="c-done"></i><i class="c-done"></i><i class="c-done"></i><i class="c-doing"></i><i class="c-doing"></i><i class="c-empty"></i><i class="c-empty"></i><i class="c-empty"></i><i class="c-plain"></i>
+          </div>
+          <small>빈 곳 찾기 · 10개 중 1개 끝남</small>
+          <div class="map">
+            <i class="c-done"></i><i class="c-doing"></i><i class="c-empty"></i><i class="c-empty"></i><i class="c-plain"></i><i class="c-plain"></i><i class="c-plain"></i><i class="c-plain"></i><i class="c-plain"></i><i class="c-plain"></i>
+          </div>
+          <span class="chip c-done">끝남</span> <span class="chip c-check">확인 중</span> <span class="chip c-doing">만드는 중</span> <span class="chip c-empty">비어 있음</span> <span class="chip c-plain">아직 못 함</span>
+        </div>
+      </div>
+      <p class="sub" style="margin-top:10px"><b>전체 지도</b>는 요구사항 하나를 네모 한 칸으로 그립니다. 어느 부분이 많이 찼고 어느 부분이 텅 비었는지 한 번에 보입니다. 네모를 누르면 그 일의 자세히 보기로 갑니다. 프로젝트를 이끄는 사람이 가장 자주 보는 화면입니다.</p>
+    </div>
+  </div>
+
+  <!-- 9 chat -->
+  <h2 id="chat">9. 팀 대화방: 프로젝트 단체 대화</h2>
+  <p class="sub">프로젝트마다 단체 대화방이 하나 있습니다. 화면 오른쪽 한켠에 작게 붙어 있어서, 일하던 화면을 떠나지 않고 의견을 나누고 공지를 올리고 자기 이야기를 남길 수 있습니다.</p>
+  <div class="screen">
+    <div>
+      <div class="mock scroll">
+        <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp; dev_tools · 홈 (대화방을 펼친 모습)</div>
+        <div class="mock-chat">
+          <div class="side">
+            <div class="proj">dev_tools</div>
+            <div class="on">홈</div><div>빈 곳 찾기</div><div>내 작업</div><div>활동 흐름</div><div>전체 지도</div>
+          </div>
+          <div class="body faded">
+            <h4>한눈에 보기</h4>
+            <div class="tiles" style="grid-template-columns:repeat(2,1fr)">
+              <div class="tile"><div class="v">62%</div><div class="k">전체 진행</div></div>
+              <div class="tile"><div class="v">7</div><div class="k">비어 있는 일</div></div>
+            </div>
+            <h4>챙겨 볼 것</h4>
+            <div class="alert"><span class="grow"><b>같은 파일을 두 사람이 고치고 있어요.</b></span></div>
+            <h4>지금 우리 팀</h4>
+            <div class="row"><span class="av">민</span><span class="grow"><b>민지</b><br><small>Claude Code · 방금 전</small></span></div>
+            <div class="row"><span class="av">준</span><span class="grow"><b>준호</b><br><small>Codex · 2분 전</small></span></div>
+          </div>
+          <div class="chat">
+            <div class="chat-head"><span><span class="pin">1</span>팀 대화방</span><small>접기</small></div>
+            <div class="chat-pin"><span class="pin">2</span><b>공지</b> 금요일 오후 2시에 중간 점검해요.<br><small>준호 · 확인했어요 2/3</small></div>
+            <div class="chat-list">
+              <div class="msg"><span class="who">준호</span> <small>10:02</small><div class="bubble">claims.ts는 제가 오전에 끝낼게요. 오후에 건드려 주세요.</div></div>
+              <div class="msg me"><span class="who">나</span> <small>10:03</small><div class="bubble">네, 저는 다른 파일부터 할게요.<span class="attach"><span class="pin">3</span>맡은 일이 멈추면 자동으로 풀기 <span class="chip c-doing">만드는 중</span></span></div></div>
+              <div class="msg"><span class="who">서연</span> <small>10:15</small><div class="bubble"><span class="pin">4</span><b>@민지</b> 로그인 확인 부탁드려요.<span class="attach">로그인 <span class="chip c-check">확인 중</span></span></div></div>
+            </div>
+            <div class="chat-input">
+              <div class="field">메시지 쓰기</div>
+              <span class="pin">5</span><span class="btn ghost">일 붙이기</span> <span class="btn ghost">공지로</span> <span class="btn">보내기</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="sub" style="margin-top:12px"><b>접어 둔 모습</b> &nbsp; <span class="fab">대화 <span class="cnt">3</span></span> &nbsp; 접으면 화면 오른쪽 아래에 작은 단추만 남고, 안 읽은 말의 개수가 보입니다. 누르면 다시 펼쳐집니다.</p>
+    </div>
+    <div class="panel explain">
+      <ol>
+        <li><span class="pin">1</span><div><b>늘 한켠에</b><span class="txt">어느 화면에 있든 같은 자리에 있습니다. 좁게 쓰고 싶으면 접어 둘 수 있습니다.</span></div></li>
+        <li><span class="pin">2</span><div><b>공지는 맨 위에 붙여 둔다</b><span class="txt">모두가 알아야 하는 말은 공지로 올리면 대화가 흘러가도 맨 위에 남습니다. 몇 사람이 확인했는지도 보입니다.</span></div></li>
+        <li><span class="pin">3</span><div><b>일을 붙여서 말한다</b><span class="txt">말에 일 카드를 붙일 수 있습니다. 카드를 누르면 그 일로 바로 가고, 그 일의 자세히 보기에서는 이 일에 대해 나눈 말만 모아 볼 수 있습니다.</span></div></li>
+        <li><span class="pin">4</span><div><b>사람을 부른다</b><span class="txt">@이름으로 부르면 그 사람에게 바로 알림이 갑니다.</span></div></li>
+        <li><span class="pin">5</span><div><b>보내기는 간단하게</b><span class="txt">글을 쓰고 보내면 끝입니다. 필요할 때만 일을 붙이거나 공지로 올립니다.</span></div></li>
+      </ol>
+      <div class="why"><b>왜 이렇게 했나요?</b> 이야기하려고 다른 메신저로 옮겨 가면 일하던 흐름이 끊기고, 무슨 일에 대한 말이었는지도 흩어집니다. 대화를 일 바로 옆에 두면 말과 일이 이어집니다.</div>
+    </div>
+  </div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="panel card"><h3>사람의 말만 올라옵니다</h3><p>"파일을 고쳤다, 테스트를 돌렸다" 같은 자동 소식은 대화방에 올리지 않고 활동 흐름에만 둡니다. 섞이면 사람의 말이 묻히기 때문입니다.</p></div>
+    <div class="panel card"><h3>경고에서 바로 이야기하기</h3><p>같은 파일이 겹쳤다는 경고의 "같이 보기"를 누르면, 상대를 부르고 그 파일 이름이 적힌 말이 대화방에 미리 채워집니다. 보내기만 누르면 됩니다.</p></div>
+    <div class="panel card"><h3>나의 한마디</h3><p>"3시까지 회의예요", "오늘은 화면 쪽만 봅니다"처럼 내 상황을 한 줄로 남기면 홈의 내 줄에 보입니다. 대화방에 길게 쓰지 않아도 됩니다.</p></div>
+  </div>
+  <p class="sub" style="margin-top:14px">대화방에 글을 쓰는 것은 하고 싶을 때만 하면 됩니다. 진행 상황은 여전히 자동으로 채워지므로, 대화방에 보고를 적을 필요는 없습니다.</p>
+
+  <!-- 10 -->
+  <h2 id="tool">10. AI 개발툴 안에서</h2>
+  <p class="sub">웹 화면을 열지 않고, 쓰고 있던 AI 개발툴에 말로 물어봐도 같은 일을 할 수 있습니다. 화면을 왔다 갔다 하지 않아도 됩니다.</p>
+  <div class="term"><span class="me">&gt; 지금 비어 있는 일 보여 줘</span>
+
+<span class="dim">dev_tools에서 가져왔어요.</span>
+  1. 맡은 일이 멈추면 자동으로 풀기     급함 · 일부만 있음
+  2. Codex에서 활동 받아 오기           아직 없음
+  3. 빈 곳 목록에 급한 순서 표시하기     3일째 비어 있음
+
+<span class="me">&gt; 1번 내가 맡을게</span>
+
+<span class="ok">✓ 맡았어요.</span> 지금부터 이 작업의 진행 상황이 팀 화면에 보입니다.
+<span class="dim">알아 둘 것: 민지 님이 server/claims.ts를 고치고 있어요.</span>
+
+<span class="me">&gt; 팀 대화방에 "claims.ts 오후에 제가 이어서 볼게요"라고 남겨 줘</span>
+
+<span class="ok">✓ 대화방에 남겼어요.</span></div>
+  <p class="sub" style="margin-top:12px">맡기는 여기서도 사람이 직접 말해야 합니다. AI 개발툴이 스스로 일을 골라 맡지는 않습니다.</p>
+
+  <!-- 10 -->
+  <h2 id="day">11. 하루의 흐름</h2>
+  <p class="sub">개발자 한 사람이 하루 동안 화면을 어떻게 쓰는지 따라가 봅니다.</p>
+  <div class="grid g5 journey">
+    <div class="panel card"><div class="n">1 · 홈</div><h3>아침에 열어 본다</h3><p>진행률과 팀원들이 하는 일을 봅니다. 챙겨 볼 것이 있으면 먼저 처리합니다.</p><div class="time">10초쯤</div></div>
+    <div class="panel card"><div class="n">2 · 빈 곳 찾기</div><h3>할 일을 고른다</h3><p>위에 올라온 급한 일 중 하나를 눌러 AI의 이유를 읽습니다.</p><div class="time">1분쯤</div></div>
+    <div class="panel card"><div class="n">3 · 자세히 보기</div><h3>맡는다</h3><p>빈 곳이 맞으면 "내가 맡을게요"를 누릅니다. 틀렸으면 "이미 있어요"를 누릅니다.</p><div class="time">한 번 누르기</div></div>
+    <div class="panel card"><div class="n">4 · AI 개발툴</div><h3>평소처럼 만든다</h3><p>자기 도구로 일합니다. 진행 상황은 자동으로 팀 화면에 올라갑니다.</p><div class="time">대부분의 시간</div></div>
+    <div class="panel card"><div class="n">5 · 내 작업</div><h3>끝내고 다음 일로</h3><p>테스트가 통과하면 "끝났어요"를 누르고, 추천된 다음 일을 고릅니다.</p><div class="time">한 번 누르기</div></div>
+  </div>
+  <p class="sub" style="margin-top:14px">사람이 직접 하는 일은 고르기, 맡기, 끝내기 세 번의 누르기입니다. 나머지는 화면이 알아서 채웁니다.</p>
+
+  <!-- 11 -->
+  <h2 id="color">12. 색과 알림</h2>
+  <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+    <div class="panel scroll">
+      <h3>상태를 나타내는 색</h3>
+      <table>
+        <thead><tr><th>표시</th><th>뜻</th></tr></thead>
+        <tbody>
+          <tr><td><span class="chip c-empty">비어 있음</span></td><td>맡은 사람이 없습니다. 지금 맡을 수 있습니다</td></tr>
+          <tr><td><span class="chip c-doing">만드는 중</span></td><td>누군가 맡아서 하고 있습니다</td></tr>
+          <tr><td><span class="chip c-check">확인 중</span></td><td>다 만들었고, 끝났는지 살펴보고 있습니다</td></tr>
+          <tr><td><span class="chip c-done">끝남</span></td><td>테스트가 통과했고 사람이 확인했습니다</td></tr>
+          <tr><td><span class="chip c-warn">급함 · 겹침</span></td><td>바로 살펴봐야 합니다</td></tr>
+          <tr><td><span class="chip c-plain">아직 못 함 · 쉬는 중</span></td><td>지금은 손댈 수 없거나 멈춰 있습니다</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="panel scroll">
+      <h3>언제 알리나요</h3>
+      <table>
+        <thead><tr><th>일어난 일</th><th>알리는 방법</th></tr></thead>
+        <tbody>
+          <tr><td>내가 고치는 파일을 다른 사람도 고치기 시작함</td><td>바로 알림</td></tr>
+          <tr><td>내가 맡은 일이 곧 자동으로 풀림</td><td>바로 알림</td></tr>
+          <tr><td>누가 나에게 확인을 부탁함</td><td>바로 알림</td></tr>
+          <tr><td>대화방에서 누가 나를 부름, 새 공지가 올라옴</td><td>바로 알림</td></tr>
+          <tr><td>대화방에 보통 말이 올라옴</td><td>대화 단추의 숫자만 바뀜</td></tr>
+          <tr><td>먼저 끝나야 하던 일이 끝나서 이제 시작할 수 있음</td><td>홈의 "챙겨 볼 것"에 표시</td></tr>
+          <tr><td>AI가 빈 곳을 새로 찾음</td><td>홈의 숫자만 바뀜</td></tr>
+          <tr><td>팀원이 파일을 고침, 테스트를 돌림</td><td>알리지 않음. 활동 흐름에서 볼 수 있음</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="panel card"><h3>처음 켰을 때</h3><p>아무것도 없는 빈 화면 대신 "요구사항을 먼저 적어 주세요"와 "AI 개발툴을 연결해 주세요" 두 가지 안내만 보여 줍니다. 명령 한 줄을 복사해 붙이면 연결됩니다.</p></div>
+    <div class="panel card"><h3>연결이 끊겼을 때</h3><p>도구에서 소식이 오지 않으면 그 사람의 줄에 "소식이 끊겼어요"라고 적습니다. 오래된 정보를 지금 일처럼 보여 주지 않습니다.</p></div>
+    <div class="panel card"><h3>AI가 확신하지 못할 때</h3><p>확신이 낮은 빈 곳은 "확인이 필요한 일"로 따로 모읍니다. 확실한 것과 섞이지 않게 합니다.</p></div>
+  </div>
+
+  <!-- team -->
+  <h2 id="team">13. 로그인과 팀원</h2>
+  <p class="sub">팀은 두 사람으로 시작하지만 사람이 계속 늘거나 줄 수 있습니다. 그래서 화면은 사람 수에 묶이지 않게 만들고, 사람을 넣고 빼는 일은 설정에서 바로 할 수 있게 합니다.</p>
+  <div class="screen">
+    <div class="mock scroll">
+      <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp; dev_tools · 설정 · 팀원</div>
+      <div class="mock-in">
+        <div class="side">
+          <div class="proj">dev_tools</div>
+          <div>홈</div><div>빈 곳 찾기</div><div>내 작업</div><div>활동 흐름</div><div>전체 지도</div><div>출시</div><div class="on">설정</div>
+        </div>
+        <div class="body">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b><span class="pin">1</span>팀원 3명</b><span class="btn">팀원 추가</span></div>
+          <div class="row"><span class="av">민</span><span class="grow"><b>민지</b> <small>minji</small><br><small><span class="pin">2</span>관리자 · 책임자 · 개발자</small></span><small><span class="pin">3</span>Claude Code · Codex</small></div>
+          <div class="row"><span class="av">준</span><span class="grow"><b>준호</b> <small>junho</small><br><small>책임자 · 개발자</small></span><small>Codex</small></div>
+          <div class="row"><span class="av">서</span><span class="grow"><b>서연</b> <small>seoyeon</small><br><small>개발자</small></span><span class="chip c-plain"><span class="pin">4</span>쉬는 중</span></div>
+          <h4><span class="pin">5</span>내 컴퓨터 연결</h4>
+          <div class="row"><span class="grow">사무실 노트북<br><small>어제 연결 · 방금 전 사용</small></span><span class="btn ghost">끊기</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel explain">
+      <ol>
+        <li><span class="pin">1</span><div><b>사람은 언제든 넣고 뺍니다</b><span class="txt">관리자가 "팀원 추가"를 누르고 이름과 ID를 적으면 임시 비밀번호가 나옵니다. 사람 수에 제한이 없습니다.</span></div></li>
+        <li><span class="pin">2</span><div><b>역할</b><span class="txt">관리자, 책임자, 개발자 세 가지입니다. 한 사람이 여러 역할을 가질 수 있어서, 두 사람일 때는 둘 다 모든 역할을 가집니다.</span></div></li>
+        <li><span class="pin">3</span><div><b>쓰는 AI 도구는 저절로 보입니다</b><span class="txt">어떤 도구를 쓰는지 따로 적지 않습니다. 연결된 도구에서 소식이 오면 자동으로 표시됩니다.</span></div></li>
+        <li><span class="pin">4</span><div><b>쉬게 하기</b><span class="txt">잠시 빠지는 사람은 지우지 않고 쉬게 합니다. 그 사람이 맡고 있던 일은 풀려서 다른 사람이 맡을 수 있고, 남긴 기록과 대화는 그대로 남습니다.</span></div></li>
+        <li><span class="pin">5</span><div><b>내 컴퓨터 연결</b><span class="txt">어느 컴퓨터가 연결돼 있는지 보고, 안 쓰는 것은 끊을 수 있습니다.</span></div></li>
+      </ol>
+    </div>
+  </div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="panel card"><h3>dev_tools 로그인</h3><p>ID와 비밀번호로 들어옵니다. 누가 맡았고 누가 확인했는지를 가리기 위한 것입니다.</p></div>
+    <div class="panel card"><h3>AI 도구의 로그인은 따로</h3><p>Codex, Claude, KIMI 같은 AI 도구는 각자가 그 회사의 계정으로 직접 로그인합니다. dev_tools는 그 계정이나 비밀번호를 묻지 않고 갖고 있지도 않습니다.</p></div>
+    <div class="panel card"><h3>처음 연결할 때</h3><p>자기 컴퓨터에서 연결 명령을 한 번 실행하고 dev_tools의 ID와 비밀번호를 넣으면 끝입니다. 그 뒤로는 평소처럼 AI 도구를 쓰면 됩니다.</p></div>
+  </div>
+
+  <!-- release -->
+  <h2 id="release">14. 출시와 전달</h2>
+  <p class="sub">빈 곳이 다 채워지고 모두 확인을 마친 다음의 화면입니다. 테스트, 만들기, 전달, 설치, 확인은 자동으로 돕니다. 사람은 내보내도 되는지 정하고, 기계가 볼 수 없는 것만 직접 봅니다.</p>
+  <div class="screen">
+    <div class="mock scroll">
+      <div class="mock-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i>&nbsp; dev_tools · 출시 · 1.0 버전</div>
+      <div class="mock-in">
+        <div class="side">
+          <div class="proj">dev_tools</div>
+          <div>홈</div><div>빈 곳 찾기</div><div>내 작업</div><div>활동 흐름</div><div>전체 지도</div><div class="on">출시</div><div>설정</div>
+        </div>
+        <div class="body">
+          <div class="two">
+            <div>
+              <div class="box"><small><span class="pin">1</span>이번 버전 · 1.0 → 고객A</small><br><b>요구사항 42개 모두 끝남</b> <span class="chip c-done">준비됨</span><br><small>담당자: 준호 · 준호의 컴퓨터에서 실행 중</small></div>
+              <div class="box">
+                <small><span class="pin">2</span>진행 (자동)</small>
+                <div class="ev">✓ 전체 테스트 <small>2분 10초</small></div>
+                <div class="ev">✓ 결과물 만들기 <small>app-1.0.tar.gz</small></div>
+                <div class="ev">✓ 출시 승인 <small>민지</small></div>
+                <div class="ev">✓ 저장소에 올리기 · 메일 알림</div>
+                <div class="ev">✓ 서버에 설치하고 전환</div>
+                <div class="ev">● 운영 확인 <small>4개 중 3개 통과</small></div>
+              </div>
+            </div>
+            <div>
+              <div class="box">
+                <small><span class="pin">3</span>출시 승인</small>
+                <div class="ev">테스트 통과 · 결과물 준비됨</div>
+                <div class="ev"><span class="chip c-done">민지가 승인함</span></div>
+              </div>
+              <div class="box">
+                <small><span class="pin">4</span>사람이 볼 것</small>
+                <div class="ev">첫 화면이 제대로 보이나요?</div>
+                <div class="ev"><span class="btn">네, 잘 보여요</span> <span class="btn ghost">아니요</span></div>
+              </div>
+              <div class="box"><small><span class="pin">5</span>고객에게 줄 문서</small><div class="ev">바뀐 점 · 요구사항 확인서</div></div>
+              <div><small><span class="pin">6</span>문제가 생기면 이전 버전으로 자동으로 되돌려요.</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel explain">
+      <ol>
+        <li><span class="pin">1</span><div><b>이번 버전과 담당자</b><span class="txt">이 버전에 넣기로 한 일이 다 끝났는지 보여 줍니다. 담당자가 전달을 맡고, 자기 컴퓨터에서 명령 하나를 실행하면 시작됩니다.</span></div></li>
+        <li><span class="pin">2</span><div><b>자동으로 도는 단계</b><span class="txt">프로젝트의 출시 방법서에 적어 둔 순서대로 돕니다. 지금 어디까지 왔는지 팀 모두가 실시간으로 봅니다.</span></div></li>
+        <li><span class="pin">3</span><div><b>출시 승인은 사람이</b><span class="txt">결과물이 만들어지면 멈춰서 기다립니다. 책임자가 승인해야 고객에게 전달하는 단계로 넘어갑니다. 건너뛸 수 없습니다.</span></div></li>
+        <li><span class="pin">4</span><div><b>사람이 볼 것</b><span class="txt">화면이 제대로 보이는지처럼 기계가 판단하기 어려운 것은 멈춰서 담당자에게 묻습니다.</span></div></li>
+        <li><span class="pin">5</span><div><b>고객에게 줄 문서</b><span class="txt">무엇이 바뀌었는지, 요구사항이 하나하나 채워졌는지를 적은 문서가 자동으로 만들어집니다.</span></div></li>
+        <li><span class="pin">6</span><div><b>되돌리기</b><span class="txt">설치한 뒤 확인에서 문제가 나오면 이전 버전으로 자동으로 돌아갑니다. 이전 버전은 지우지 않고 남겨 둡니다.</span></div></li>
+      </ol>
+      <div class="why"><b>왜 이렇게 했나요?</b> 손으로 하면 빠뜨리거나 사람마다 다르게 하기 쉽습니다. 순서를 파일로 적어 두고 그대로 돌리면 매번 같게 됩니다. 실행은 담당자의 컴퓨터에서 하므로 고객 서버의 주소나 비밀번호는 이 화면에도 서버에도 남지 않습니다.</div>
+    </div>
+  </div>
+  <div class="grid g3" style="margin-top:12px">
+    <div class="panel card"><h3>먼저 해 보기</h3><p>처음 쓰는 고객 서버에는 "미리 해 보기"로 돌립니다. 아무것도 바꾸지 않고 무엇을 할지만 순서대로 보여 줍니다.</p></div>
+    <div class="panel card"><h3>자동으로 못 할 때</h3><p>고객이 자동 접속을 허락하지 않으면 같은 순서를 점검표로 띄워 담당자가 하나씩 손으로 하고 표시합니다.</p></div>
+    <div class="panel card"><h3>전달한 뒤</h3><p>고객이 준 의견이나 운영 중에 찾은 문제는 담당자가 새 할 일로 적습니다. 그 일은 다시 빈 곳이 되어 처음 흐름으로 돌아갑니다.</p></div>
+  </div>
+
+  <!-- open -->
+  <h2 id="open">15. 아직 정해야 할 것</h2>
+  <p class="sub">이 밑그림은 정의서와 개발 방향 문서를 바탕으로 한 제안입니다. 아래는 화면에 영향을 주는데 아직 정해지지 않은 것들입니다.</p>
+  <div class="panel scroll">
+    <table>
+      <thead><tr><th>정할 것</th><th>이 밑그림에서 가정한 것</th></tr></thead>
+      <tbody>
+        <tr><td>끝났다는 확인을 누가 하는가</td><td>테스트 통과 뒤 다른 팀원 한 사람이 확인</td></tr>
+        <tr><td>얼마 동안 멈추면 자동으로 풀리는가</td><td>예시로 1시간. 실제 값은 써 보면서 정함</td></tr>
+        <tr><td>화면에서 쓰는 말</td><td>"빈 곳", "맡기" 같은 쉬운 말. 팀이 익숙한 말로 바꿀 수 있음</td></tr>
+        <tr><td>급한 순서를 누가 정하는가</td><td>프로젝트를 이끄는 사람이 표시</td></tr>
+        <tr><td>이미 쓰는 메신저와 대화방을 이을 것인가</td><td>먼저 자체 대화방만. 다른 메신저와 잇는 것은 나중에 검토</td></tr>
+        <tr><td>대화를 얼마나 오래 남겨 두는가</td><td>프로젝트가 끝날 때까지. 팀이 바꿀 수 있음</td></tr>
+        <tr><td>출시를 승인하는 사람의 수</td><td>책임자 한 사람</td></tr>
+        <tr><td>비밀번호를 잊었을 때</td><td>관리자가 임시 비밀번호를 다시 발급</td></tr>
+        <tr><td>휴대폰에서도 쓰는가</td><td>먼저 컴퓨터 화면만. 휴대폰은 알림 확인 정도</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>근거: <code>dev_tools_definition.md</code>, <code>dev_direction.md</code>, <code>research.md</code> · 초안 2026-11-26 · 화면 속 이름과 숫자는 모두 예시입니다.</footer>
+</main>
+</body>
+</html>

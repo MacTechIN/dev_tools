@@ -285,7 +285,27 @@
     </div>
   </div>
 
-  <footer>근거: <code>dev_tools_definition.md</code>, <code>research.md</code> · 초안 2026-11-20 · 구현 기술은 미정이며 이 그림은 흐름만 나타낸다.</footer>
+  <h2>완료 승인 뒤: 출시와 전달</h2>
+  <p class="lead">모든 빈 곳이 채워지고 승인된 다음의 다섯 단계입니다. 출시 승인을 뺀 나머지는 실행기가 자동으로 수행하고, 실행기는 담당자의 컴퓨터나 CI에서 돕니다.</p>
+  <div class="panel scroll">
+    <table>
+      <thead><tr><th>단계</th><th>주체</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td class="num">13</td><td class="who"><span class="tag tool">실행기</span></td><td>이번 버전의 작업을 모두 합친 상태에서 전체 테스트를 돌린다. 실패하면 관련 요구사항이 빈 곳으로 돌아간다.</td></tr>
+        <tr><td class="num">14</td><td class="who"><span class="tag tool">실행기</span></td><td>출시 방법서대로 결과물을 만들고 고객이 원하는 형식으로 가공한다. 확인값을 계산한다.</td></tr>
+        <tr><td class="num">15</td><td class="who"><span class="tag human">사람</span></td><td>책임자가 출시를 승인한다. 실행기는 승인을 기다리며 멈춰 있다.</td></tr>
+        <tr><td class="num">16</td><td class="who"><span class="tag tool">실행기</span></td><td>클라우드 저장소에 올리고 메일로 알리거나, 고객 서버에 SSH로 설치하고 새 버전으로 전환한다.</td></tr>
+        <tr><td class="num">17</td><td class="who"><span class="tag tool">실행기</span> <span class="tag human">사람</span></td><td>운영 확인을 돌린다. 눈으로 봐야 하는 것은 담당자가 본다. 실패하면 자동으로 이전 버전으로 되돌린다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid" style="margin-top:12px">
+    <div class="panel card"><h3>dev_tools 서버가 하는 일</h3><p>진행을 실시간으로 보여 주고, 승인을 받고, 기록을 남긴다. 직접 빌드하거나 고객 서버에 접속하지 않는다.</p></div>
+    <div class="panel card"><h3>자동으로 못 할 때</h3><p>고객이 자동 접속을 허락하지 않으면 같은 출시 방법서를 점검표로 삼아 담당자가 손으로 수행한다.</p></div>
+    <div class="panel card"><h3>전달한 뒤</h3><p>고객의 의견과 발견된 문제는 새 요구사항이 되어 빈 곳 목록에 들어가고, 6단계부터 다시 돈다.</p></div>
+  </div>
+
+  <footer>근거: <code>dev_tools_definition.md</code>, <code>docs/release_delivery.md</code> · 2026-11-26 · 이 그림은 흐름만 나타낸다. 구현 기술은 <code>docs/tech_design.md</code>에 있다.</footer>
 </main>
 </body>
 </html>

@@ -1,0 +1,17 @@
+services:
+  devtools:
+    build: .
+    image: devtools-webapp:${VERSION:-local}
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4100}:4100"
+    environment:
+      ADMIN_ID: ${ADMIN_ID:-}
+      ADMIN_NAME: ${ADMIN_NAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    volumes:
+      - devtools-data:/data
+
+volumes:
+  devtools-data:

@@ -1,0 +1,92 @@
+import type { EventKind, Presence, Role, Tool } from "@devtools/shared";
+
+// All UI text lives here. Wording follows docs/ui_concept.html section 1.
+export const S = {
+  appName: "dev_tools",
+  nav: { home: "홈", feed: "활동 흐름", settings: "설정" },
+  logout: "나가기",
+  loading: "불러오는 중이에요",
+  reconnecting: "연결이 끊겼어요. 다시 잇는 중이에요.",
+  login: {
+    title: "dev_tools에 들어가기",
+    id: "ID",
+    password: "비밀번호",
+    submit: "들어가기",
+    hint: "AI 개발툴의 계정이 아니라 dev_tools의 ID와 비밀번호예요.",
+  },
+  firstPassword: {
+    title: "비밀번호를 새로 정해 주세요",
+    body: "임시 비밀번호로 들어왔어요. 계속하려면 나만 아는 비밀번호로 바꿔 주세요.",
+  },
+  password: {
+    section: "비밀번호 바꾸기",
+    current: "지금 비밀번호",
+    next: "새 비밀번호 (8자 이상)",
+    submit: "바꾸기",
+    done: "비밀번호를 바꿨어요.",
+  },
+  home: {
+    team: "지금 우리 팀",
+    resting: (n: number) => `쉬는 팀원 ${n}명`,
+    notePlaceholder: "한마디 남기기 (예: 3시까지 회의예요)",
+    noteSave: "남기기",
+    noActivity: "아직 연결한 AI 개발툴이 없어요",
+    emptyTitle: "아직 들어온 소식이 없어요",
+    emptyBody: "팀원이 AI 개발툴을 연결하면 누가 무엇을 하는지 여기에 자동으로 보여요. 따로 적을 필요가 없어요.",
+    files: (n: number) => `파일 ${n}개 고치는 중`,
+    you: "나",
+  },
+  feed: {
+    title: "활동 흐름",
+    empty: "아직 일어난 일이 없어요",
+    lead: "맡기, 끝내기, 테스트처럼 굵직한 일만 보여 줘요. 파일을 하나하나 고친 것은 올리지 않아요.",
+  },
+  settings: {
+    members: (n: number) => `팀원 ${n}명`,
+    add: "팀원 추가",
+    addId: "ID (영문, 숫자)",
+    addName: "이름",
+    rest: "쉬게 하기",
+    wake: "다시 부르기",
+    reset: "임시 비밀번호",
+    restingChip: "쉬는 중",
+    tempPassword: (name: string, pw: string) => `${name} 님의 임시 비밀번호: ${pw}`,
+    tempPasswordHint: "이 비밀번호는 지금만 보여요. 본인에게 전해 주세요. 처음 들어올 때 새로 정하게 돼요.",
+    devices: "내 컴퓨터 연결",
+    devicesEmpty: "연결된 컴퓨터가 없어요.",
+    devicesHint: "연결 명령은 아직 만들고 있어요. 준비되면 내 컴퓨터에서 명령을 한 번 실행하고 dev_tools의 ID와 비밀번호를 넣으면 돼요.",
+    disconnect: "끊기",
+    lastUsed: "마지막 사용",
+    never: "아직 안 씀",
+    aiNote: "AI 개발툴(Codex, Claude, KIMI 등)은 각자 그 회사의 계정으로 직접 로그인해요. dev_tools는 그 계정을 묻지도 갖고 있지도 않아요.",
+  },
+  roles: { admin: "관리자", lead: "책임자", dev: "개발자" } satisfies Record<Role, string>,
+  tools: { "claude-code": "Claude Code", codex: "Codex", kimi: "KIMI", gemini: "Gemini", git: "git" } satisfies Record<Tool, string>,
+  presence: { working: "일하는 중", idle: "잠시 멈춤", lost: "소식이 끊겼어요", offline: "꺼져 있음" } satisfies Record<Presence, string>,
+  activity: {
+    "session.start": "방금 시작했어요",
+    "session.end": "작업을 마쳤어요",
+    "session.idle": "입력을 기다리는 중",
+    "turn.start": "AI에게 일을 시키는 중",
+    "turn.end": "입력을 기다리는 중",
+    "file.change": "파일을 고치는 중",
+    "command.run": "명령을 돌리는 중",
+    "test.result": "테스트를 돌렸어요",
+    "git.commit": "커밋했어요",
+    "git.branch": "브랜치를 바꿨어요",
+  } satisfies Record<EventKind, string>,
+  errors: {
+    invalid_credentials: "ID나 비밀번호가 맞지 않아요.",
+    too_many_attempts: "여러 번 틀렸어요. 1분 뒤에 다시 해 주세요.",
+    weak_password: "새 비밀번호는 8자 이상이어야 해요.",
+    login_id_taken: "이미 쓰고 있는 ID예요.",
+    invalid_request: "입력한 내용을 다시 확인해 주세요.",
+    admin_only: "관리자만 할 수 있어요.",
+    last_admin: "관리자가 한 명은 남아 있어야 해요.",
+    unknown: "문제가 생겼어요. 잠시 뒤에 다시 해 주세요.",
+  } as Record<string, string>,
+};
+
+export function errorText(code: string): string {
+  return S.errors[code] ?? S.errors.unknown!;
+}
