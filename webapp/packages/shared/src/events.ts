@@ -18,7 +18,8 @@ const path = z.string().max(500);
 const requirementId = z.string().regex(/^REQ-[A-Z]+-\d{3}$/);
 
 function ev<K extends string, D extends z.ZodType>(kind: K, data: D) {
-  return z.object({ ...base, kind: z.literal(kind), data: data.default({} as never) });
+  // preprocess (not .default) so an omitted data object is still validated and gets its defaults.
+  return z.object({ ...base, kind: z.literal(kind), data: z.preprocess((v) => v ?? {}, data) });
 }
 
 /**

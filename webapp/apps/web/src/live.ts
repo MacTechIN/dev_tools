@@ -11,8 +11,14 @@ export interface Live {
 }
 
 const FEED_LIMIT = 200;
+const RETRY_MIN_MS = 1_000;
+const RETRY_MAX_MS = 30_000;
 
-/** Loads the snapshot once, then applies changes from the server-sent event stream. */
+/**
+ * Loads the snapshot, then applies changes from the server-sent event stream.
+ * EventSource retries network errors by itself but gives up on any non-200 answer
+ * (a proxy's 502 during a restart, say), so a closed stream starts over here.
+ */
 export function useLive(onSignedOut: () => void): Live | null {
   const [state, setState] = useState<Omit<Live, "now"> | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -24,45 +30,60 @@ export function useLive(onSignedOut: () => void): Live | null {
 
   useEffect(() => {
     let source: EventSource | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryMs = RETRY_MIN_MS;
     let stopped = false;
 
+    const setConnected = (connected: boolean) => setState((s) => s && { ...s, connected });
+
+    function restartLater() {
+      source?.close();
+      source = undefined;
+      setConnected(false);
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => void start(), retryMs);
+      retryMs = Math.min(retryMs * 2, RETRY_MAX_MS);
+    }
+
     async function start() {
+      if (stopped) return;
       let snap: Snapshot;
       try {
         snap = await api<Snapshot>("GET", "/api/snapshot");
       } catch (e) {
         if (e instanceof ApiError && (e.status === 401 || e.status === 403)) onSignedOut();
+        else restartLater();
         return;
       }
       if (stopped) return;
       setState({ members: snap.members, feed: snap.feed, connected: true });
 
-      source = new EventSource(`/api/stream?since=${snap.seq}`);
-      source.onopen = () => setState((s) => s && { ...s, connected: true });
-      source.onerror = () => {
-        setState((s) => s && { ...s, connected: false });
-        // The browser reconnects by itself; only a lost login needs handling here.
-        api("GET", "/api/me").catch((e) => {
-          if (e instanceof ApiError && e.status === 401) onSignedOut();
-        });
+      const es = new EventSource(`/api/stream?since=${snap.seq}`);
+      source = es;
+      es.onopen = () => {
+        retryMs = RETRY_MIN_MS;
+        setConnected(true);
       };
-      source.addEventListener("member", (e) => {
+      es.onerror = () => {
+        setConnected(false);
+        if (es.readyState === EventSource.CLOSED) restartLater();
+        // The server also ends the stream when the session is gone; the snapshot request then signs out.
+      };
+      es.addEventListener("member", (e) => {
         const member = JSON.parse((e as MessageEvent<string>).data) as MemberView;
-        setState((s) => {
-          if (!s) return s;
-          const others = s.members.filter((m) => m.id !== member.id);
-          return { ...s, members: [...others, member] };
-        });
+        setState((s) => s && { ...s, members: [...s.members.filter((m) => m.id !== member.id), member] });
       });
-      source.addEventListener("feed", (e) => {
+      es.addEventListener("feed", (e) => {
         const item = JSON.parse((e as MessageEvent<string>).data) as FeedItem;
         setState((s) => {
           if (!s || s.feed.some((f) => f.seq === item.seq)) return s;
           return { ...s, feed: [item, ...s.feed].slice(0, FEED_LIMIT) };
         });
       });
-      source.addEventListener("resync", () => {
-        source?.close();
+      es.addEventListener("resync", () => {
+        es.close();
+        source = undefined;
+        setConnected(false);
         void start();
       });
     }
@@ -70,6 +91,7 @@ export function useLive(onSignedOut: () => void): Live | null {
     void start();
     return () => {
       stopped = true;
+      clearTimeout(retryTimer);
       source?.close();
     };
   }, [onSignedOut]);

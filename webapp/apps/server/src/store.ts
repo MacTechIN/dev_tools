@@ -25,6 +25,8 @@ export interface MemberRow {
 }
 
 const KEEP_CHANGES = 5000;
+/** Event times further in the future than this are clamped, so a bad clock cannot pin a member as working. */
+const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 const TOOLS_WINDOW_DAYS = 30;
 
 export function parseRoles(raw: string): Role[] {
@@ -107,13 +109,17 @@ export class Store extends EventEmitter {
     return rows.filter((m) => m.id !== exceptId && parseRoles(m.roles).includes("admin")).length;
   }
 
-  /** Signs a member out everywhere: used when they are deactivated or their password is reset. */
-  revokeAccess(memberId: number): void {
+  /**
+   * Signs a member out everywhere except, optionally, one web session.
+   * Emits "revoked" so open event streams of that member close.
+   */
+  revokeAccess(memberId: number, keepSessionHash?: string): void {
     const now = new Date().toISOString();
-    this.db.prepare("DELETE FROM web_sessions WHERE member_id = ?").run(memberId);
+    this.db.prepare("DELETE FROM web_sessions WHERE member_id = ? AND id_hash != ?").run(memberId, keepSessionHash ?? "");
     this.db
       .prepare("UPDATE device_tokens SET revoked_at = ? WHERE member_id = ? AND revoked_at IS NULL")
       .run(now, memberId);
+    this.emit("revoked", memberId, keepSessionHash);
   }
 
   memberView(id: number): MemberView {
@@ -183,6 +189,7 @@ export class Store extends EventEmitter {
 
   deleteWebSession(idHash: string): void {
     this.db.prepare("DELETE FROM web_sessions WHERE id_hash = ?").run(idHash);
+    this.emit("session-ended", idHash);
   }
 
   createDeviceToken(memberId: number, label: string, tokenHash: string): number {
@@ -231,14 +238,18 @@ export class Store extends EventEmitter {
          last_event_at = max(last_event_at, @at),
          last_kind = CASE WHEN @at >= last_event_at THEN @kind ELSE last_kind END,
          branch = coalesce(@branch, branch),
-         ended_at = CASE WHEN @kind = 'session.end' THEN @at WHEN @at > coalesce(ended_at, '') THEN NULL ELSE ended_at END`,
+         ended_at = CASE
+           WHEN @kind = 'session.end' THEN CASE WHEN @at >= last_event_at THEN @at ELSE ended_at END
+           WHEN @at > coalesce(ended_at, '') THEN NULL
+           ELSE ended_at END`,
     );
     const feed: FeedItem[] = [];
     let stored = 0;
     this.db.transaction(() => {
       const receivedAt = new Date().toISOString();
+      const latest = Date.now() + MAX_CLOCK_SKEW_MS;
       for (const e of events) {
-        const at = new Date(e.at).toISOString();
+        const at = new Date(Math.min(Date.parse(e.at), latest)).toISOString();
         const info = insert.run(e.id, member.id, e.tool, e.session, e.kind, at, e.cwd ?? null, e.branch ?? null, JSON.stringify(e.data), receivedAt);
         if (info.changes === 0) continue;
         stored++;
@@ -308,6 +319,8 @@ export class Store extends EventEmitter {
 
   /** Changes after `since`, or null when they were already pruned and the client must reload. */
   changesSince(since: number): { seq: number; change: Change }[] | null {
+    // A client ahead of the server (e.g. after a restore from backup) holds state the server no longer has.
+    if (since > this.lastChangeSeq()) return null;
     const oldest = (this.db.prepare("SELECT coalesce(min(seq), 0) AS n FROM changes").get() as { n: number }).n;
     if (oldest > since + 1) return null;
     const rows = this.db.prepare("SELECT seq, type, payload FROM changes WHERE seq > ? ORDER BY seq").all(since) as {

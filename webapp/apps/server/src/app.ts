@@ -8,7 +8,7 @@ import { authRoutes } from "./routes/auth";
 import { eventRoutes } from "./routes/events";
 import { memberRoutes } from "./routes/members";
 import { streamRoutes } from "./routes/stream";
-import { hashPassword, sha256 } from "./security";
+import { hashPassword, MIN_PASSWORD_LENGTH, sha256 } from "./security";
 import { Store, type MemberRow } from "./store";
 
 declare module "fastify" {
@@ -21,7 +21,7 @@ declare module "fastify" {
 export const COOKIE_NAME = "sid";
 
 /** Routes that need no login. */
-const PUBLIC = new Set(["POST /api/login", "POST /api/device-tokens", "GET /api/health"]);
+const PUBLIC = new Set(["POST /api/login", "POST /api/device-tokens", "GET /api/health", "HEAD /api/health"]);
 /** The only routes a device token (used by adapters) may call. */
 const DEVICE_ALLOWED = new Set(["POST /api/events", "GET /api/me"]);
 /** Routes still usable while a temporary password has not been changed. */
@@ -114,9 +114,10 @@ export async function buildApp(options: BuildOptions): Promise<{ app: FastifyIns
 }
 
 /** Creates the first admin from the environment when the team is still empty. */
-export async function ensureAdmin(store: Store, config: Config): Promise<"created" | "exists" | "missing"> {
+export async function ensureAdmin(store: Store, config: Config): Promise<"created" | "exists" | "missing" | "weak"> {
   if (store.memberCount() > 0) return "exists";
   if (!config.admin) return "missing";
+  if (config.admin.password.length < MIN_PASSWORD_LENGTH) return "weak";
   store.createMember({
     loginId: config.admin.loginId,
     name: config.admin.name,

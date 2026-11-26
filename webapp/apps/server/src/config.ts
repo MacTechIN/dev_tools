@@ -15,7 +15,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const dataDir = path.resolve(env.DATA_DIR ?? "./data");
   const admin =
     env.ADMIN_ID && env.ADMIN_PASSWORD
-      ? { loginId: env.ADMIN_ID, name: env.ADMIN_NAME ?? env.ADMIN_ID, password: env.ADMIN_PASSWORD }
+      ? { loginId: env.ADMIN_ID, name: env.ADMIN_NAME || env.ADMIN_ID, password: env.ADMIN_PASSWORD }
       : undefined;
   return {
     port: Number(env.PORT ?? 4100),

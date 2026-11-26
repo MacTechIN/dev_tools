@@ -83,6 +83,8 @@ export const S = {
     invalid_request: "입력한 내용을 다시 확인해 주세요.",
     admin_only: "관리자만 할 수 있어요.",
     last_admin: "관리자가 한 명은 남아 있어야 해요.",
+    same_password: "지금과 다른 비밀번호로 정해 주세요.",
+    password_change_required: "먼저 화면에서 임시 비밀번호를 바꿔 주세요.",
     unknown: "문제가 생겼어요. 잠시 뒤에 다시 해 주세요.",
   } as Record<string, string>,
 };

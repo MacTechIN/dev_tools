@@ -14,31 +14,58 @@ export function toMe(m: MemberRow): Me {
   return { id: m.id, loginId: m.login_id, name: m.name, roles: parseRoles(m.roles), mustChangePassword: m.must_change_password === 1 };
 }
 
-export function authRoutes(app: FastifyInstance, { store, config }: AppContext) {
-  const failures = new Map<string, { count: number; lockedUntil: number }>();
-  // Verified against when the login id is unknown, so both cases take similar time.
-  const dummyHash = hashPassword(randomToken());
+interface Attempts {
+  failures: number;
+  /** Checks still running. Counted up front so parallel guesses cannot all slip past the limit. */
+  pending: number;
+  lockedUntil: number;
+}
 
-  /** Returns the member, or the HTTP status to answer with (REQ-NFR-009). */
-  async function check(loginId: string, password: string): Promise<MemberRow | 401 | 429> {
+/** Limits password guesses per login id (REQ-NFR-009). */
+export class PasswordGuard {
+  private readonly attempts = new Map<string, Attempts>();
+  // Verified against when the login id is unknown, so both cases take similar time.
+  private readonly dummyHash = hashPassword(randomToken());
+
+  constructor(private readonly lookup: (loginId: string) => MemberRow | undefined) {}
+
+  /** Returns the member, or the HTTP status to answer with. */
+  async check(loginId: string, password: string): Promise<MemberRow | 401 | 429> {
     const key = loginId.toLowerCase();
-    const entry = failures.get(key);
-    if (entry && entry.lockedUntil > Date.now()) return 429;
-    const member = store.memberByLoginId(loginId);
-    const ok = await verifyPassword(member?.password_hash ?? (await dummyHash), password);
+    const now = Date.now();
+    let a = this.attempts.get(key);
+    if (a && a.lockedUntil > now) return 429;
+    if (!a || a.lockedUntil !== 0) {
+      a = { failures: 0, pending: 0, lockedUntil: 0 };
+      this.attempts.set(key, a);
+    }
+    if (a.failures + a.pending >= MAX_FAILURES) return 429;
+    a.pending++;
+    let ok = false;
+    const member = this.lookup(loginId);
+    try {
+      ok = await verifyPassword(member?.password_hash ?? (await this.dummyHash), password);
+    } finally {
+      a.pending--;
+    }
     if (member && member.active === 1 && ok) {
-      failures.delete(key);
+      if (a.pending === 0) this.attempts.delete(key);
+      else a.failures = 0;
       return member;
     }
-    const count = (entry?.count ?? 0) + 1;
-    failures.set(key, { count: count >= MAX_FAILURES ? 0 : count, lockedUntil: count >= MAX_FAILURES ? Date.now() + LOCK_MS : 0 });
+    a.failures++;
+    if (a.failures >= MAX_FAILURES) a.lockedUntil = Date.now() + LOCK_MS;
     return 401;
   }
+}
+
+export function authRoutes(app: FastifyInstance, { store, config }: AppContext) {
+  const guard = new PasswordGuard((loginId) => store.memberByLoginId(loginId));
 
   app.post("/api/login", async (req, reply) => {
     const body = credentials.safeParse(req.body);
     if (!body.success) return fail(reply, 400, "invalid_request");
-    const result = await check(body.data.loginId, body.data.password);
+    const result = await guard.check(body.data.loginId, body.data.password);
     if (result === 429) return fail(reply, 429, "too_many_attempts");
     if (result === 401) return fail(reply, 401, "invalid_credentials");
     const sid = randomToken();
@@ -62,13 +89,19 @@ export function authRoutes(app: FastifyInstance, { store, config }: AppContext) 
 
   app.get("/api/me", async (req) => ({ me: toMe(req.member) }));
 
+  // Changing the password signs out every other session and device, so a leaked
+  // temporary password stops working everywhere once it is replaced (REQ-ADM-011).
   app.put("/api/me/password", async (req, reply) => {
     const body = z
       .object({ current: z.string().min(1).max(200), next: z.string().min(MIN_PASSWORD_LENGTH).max(200) })
       .safeParse(req.body);
     if (!body.success) return fail(reply, 400, "weak_password");
-    if (!(await verifyPassword(req.member.password_hash, body.data.current))) return fail(reply, 401, "invalid_credentials");
+    if (body.data.next === body.data.current) return fail(reply, 400, "same_password");
+    const result = await guard.check(req.member.login_id, body.data.current);
+    if (result === 429) return fail(reply, 429, "too_many_attempts");
+    if (result === 401) return fail(reply, 401, "invalid_credentials");
     store.updateMember(req.member.id, { passwordHash: await hashPassword(body.data.next), mustChangePassword: false });
+    store.revokeAccess(req.member.id, sha256(req.cookies[COOKIE_NAME] ?? ""));
     return { ok: true };
   });
 
@@ -82,11 +115,13 @@ export function authRoutes(app: FastifyInstance, { store, config }: AppContext) 
 
   // Used by the connect command: logs in once and keeps only the returned token (REQ-ADM-012).
   app.post("/api/device-tokens", async (req, reply) => {
-    const body = credentials.extend({ label: z.string().min(1).max(60) }).safeParse(req.body);
+    const body = credentials.extend({ label: z.string().trim().min(1).max(60) }).safeParse(req.body);
     if (!body.success) return fail(reply, 400, "invalid_request");
-    const result = await check(body.data.loginId, body.data.password);
+    const result = await guard.check(body.data.loginId, body.data.password);
     if (result === 429) return fail(reply, 429, "too_many_attempts");
     if (result === 401) return fail(reply, 401, "invalid_credentials");
+    // A temporary password must be replaced in the browser before connecting a computer.
+    if (result.must_change_password === 1) return fail(reply, 403, "password_change_required");
     const token = randomToken();
     const id = store.createDeviceToken(result.id, body.data.label, sha256(token));
     return { id, token };
