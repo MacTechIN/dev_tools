@@ -9,17 +9,40 @@ dev_tools의 제품 코드다. 이 폴더만으로 빌드하고 배포한다. �
 - 컴퓨터용 토큰 발급과 끊기
 - 공통 형식의 활동 이벤트 수집 (프롬프트와 코드 본문은 저장하지 않음)
 - 실시간 화면: 홈(지금 우리 팀), 활동 흐름, 설정
+- 연결 명령(`devtools connect`)과 Claude Code, Codex CLI 어댑터. 세션, 지시, 파일 변경, 명령, 브랜치와 커밋이 자동으로 들어온다
 
-아직 없는 것: AI 개발툴 어댑터와 연결 명령, 맡기(claim), 갭 탐지, 팀 대화방, 출시. 어댑터가 없어서 지금은 실제 AI 개발툴의 활동이 들어오지 않는다. 아래의 시험용 스크립트로 보낸 활동만 화면에 보인다.
+아직 없는 것: 맡기(claim), 갭 탐지, 팀 대화방, 출시, 테스트 결과 수집.
 
 ## 구성
 
 ```
-apps/server      서버 (Fastify, SQLite). 빌드된 화면도 함께 내보낸다
-apps/web         화면 (React, Vite)
-packages/shared  공통 이벤트 형식, 타입, 상태 계산 규칙
-scripts          시험용 스크립트
+apps/server        서버 (Fastify, SQLite). 빌드된 화면과 연결 명령 파일도 함께 내보낸다
+apps/web           화면 (React, Vite)
+packages/shared    공통 이벤트 형식, 타입, 상태 계산 규칙
+packages/adapters  도구별 변환 함수와 실제 도구에서 받은 hook 표본(fixtures)
+packages/cli       devtools 명령. 빌드하면 파일 하나(dist/devtools.mjs)
+scripts            시험용 스크립트
 ```
+
+## 팀원의 컴퓨터 연결
+
+각 팀원이 자기 컴퓨터의 프로젝트 폴더에서 한 번 실행한다. Node.js 22 이상이 필요하다.
+
+```bash
+curl -fsSL -o devtools.mjs https://<서버>/devtools.mjs
+node devtools.mjs connect --server https://<서버>
+```
+
+- ID와 비밀번호를 한 번 묻고, 비밀번호 대신 이 컴퓨터용 토큰만 `~/.config/devtools/`에 저장한다. 임시 비밀번호인 동안에는 먼저 브라우저에서 비밀번호를 바꿔야 한다.
+- 설치된 `claude`, `codex`를 찾아 hook을 넣는다. 특정 도구만 넣으려면 `--tools claude-code` 처럼 지정한다.
+- Claude Code: 이미 열린 세션은 다시 시작해야 기록이 시작된다.
+- Codex: 처음 열 때 새 hook을 신뢰할지 묻는다. 승인해야 기록이 시작된다.
+- 프롬프트, 응답, 파일 내용, 명령 문자열은 컴퓨터 밖으로 나가지 않는다. 파일 경로와 명령의 종류(테스트, 빌드, 기타)만 보낸다.
+
+| 명령 | 하는 일 |
+|---|---|
+| `node ~/.config/devtools/bin/devtools.mjs status` | 연결 상태와 아직 보내지 못한 기록 수 |
+| `node ~/.config/devtools/bin/devtools.mjs disconnect` | 이 프로젝트의 연결만 끊기. `--all`이면 전부 끊고 토큰 폐기 |
 
 ## 개발
 
@@ -41,7 +64,7 @@ npm run dev:web
 | `npm test -w @devtools/server -- auth` | 서버 테스트 중 파일 이름에 `auth`가 들어간 것만 |
 | `npm test -w @devtools/server -- -t "REQ-ADM-008"` | 이름에 그 요구사항 ID가 들어간 테스트만 |
 | `npm run typecheck` | 타입 검사 |
-| `npm run build` | 화면과 서버를 빌드 |
+| `npm run build` | 화면, 연결 명령, 서버를 빌드 |
 | `npm start` | 빌드한 서버 실행 |
 
 화면에 활동을 채워 보려면 서버를 띄운 뒤 시험용 스크립트를 실행한다.
@@ -61,6 +84,7 @@ PASSWORD=<관리자 비밀번호> npm run sample-events
 | `ADMIN_ID`, `ADMIN_PASSWORD`, `ADMIN_NAME` | 없음 | 팀원이 한 명도 없을 때 이 값으로 관리자를 만든다 |
 | `COOKIE_SECURE` | `false` | HTTPS 뒤에서 쓸 때 `true` |
 | `WEB_DIST` | `apps/web/dist` | 빌드된 화면의 위치 |
+| `CLI_BUNDLE` | `packages/cli/dist/devtools.mjs` | `/devtools.mjs`로 내려줄 연결 명령 파일 |
 
 ## 배포
 
@@ -95,6 +119,7 @@ DATA_DIR=/var/lib/devtools npm run create-admin -- <ID> <이름>
 2. 브라우저에서 관리자로 로그인된다.
 3. 설정에서 팀원을 추가하면 임시 비밀번호가 나온다.
 4. 서버를 다시 시작해도 로그인과 기록이 남아 있다.
+5. `curl -I http://<서버>:4100/devtools.mjs`가 200을 돌려준다.
 
 ### 운영할 때
 

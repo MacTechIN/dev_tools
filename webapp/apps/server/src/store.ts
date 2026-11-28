@@ -199,7 +199,7 @@ export class Store extends EventEmitter {
     return Number(info.lastInsertRowid);
   }
 
-  memberByDeviceToken(tokenHash: string): MemberRow | undefined {
+  memberByDeviceToken(tokenHash: string): (MemberRow & { token_id: number }) | undefined {
     const row = this.db
       .prepare(
         "SELECT m.*, t.id AS token_id FROM device_tokens t JOIN members m ON m.id = t.member_id WHERE t.token_hash = ? AND t.revoked_at IS NULL AND m.active = 1",

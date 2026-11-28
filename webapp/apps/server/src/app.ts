@@ -15,6 +15,8 @@ declare module "fastify" {
   interface FastifyRequest {
     member: MemberRow;
     authKind: "web" | "device";
+    /** Set when the request used a device token. */
+    deviceTokenId?: number;
   }
 }
 
@@ -23,7 +25,7 @@ export const COOKIE_NAME = "sid";
 /** Routes that need no login. */
 const PUBLIC = new Set(["POST /api/login", "POST /api/device-tokens", "GET /api/health", "HEAD /api/health"]);
 /** The only routes a device token (used by adapters) may call. */
-const DEVICE_ALLOWED = new Set(["POST /api/events", "GET /api/me"]);
+const DEVICE_ALLOWED = new Set(["POST /api/events", "GET /api/me", "DELETE /api/device-tokens/self"]);
 /** Routes still usable while a temporary password has not been changed. */
 const BEFORE_PASSWORD_CHANGE = new Set(["GET /api/me", "PUT /api/me/password", "POST /api/logout"]);
 
@@ -83,8 +85,10 @@ export async function buildApp(options: BuildOptions): Promise<{ app: FastifyIns
     const bearer = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
     let member: MemberRow | undefined;
     if (bearer) {
-      member = store.memberByDeviceToken(sha256(bearer));
+      const row = store.memberByDeviceToken(sha256(bearer));
+      member = row;
       req.authKind = "device";
+      req.deviceTokenId = row?.token_id;
     } else if (sid) {
       member = store.memberByWebSession(sha256(sid));
       req.authKind = "web";
@@ -102,6 +106,12 @@ export async function buildApp(options: BuildOptions): Promise<{ app: FastifyIns
   memberRoutes(app, ctx);
   eventRoutes(app, ctx);
   streamRoutes(app, ctx);
+
+  // The connect command is downloaded from the server it connects to (REQ-ADM-001). It holds no secrets.
+  app.get("/devtools.mjs", async (_req, reply) => {
+    if (!fs.existsSync(config.cliBundle)) return fail(reply, 404, "not_found");
+    return reply.type("text/javascript; charset=utf-8").send(fs.createReadStream(config.cliBundle));
+  });
 
   const hasWeb = fs.existsSync(config.webDist);
   if (hasWeb) await app.register(fastifyStatic, { root: config.webDist, wildcard: false });

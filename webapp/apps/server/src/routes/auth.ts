@@ -127,6 +127,13 @@ export function authRoutes(app: FastifyInstance, { store, config }: AppContext) 
     return { id, token };
   });
 
+  // Lets `devtools disconnect` revoke the token it was using (REQ-ADM-005).
+  app.delete("/api/device-tokens/self", async (req, reply) => {
+    if (req.authKind !== "device" || req.deviceTokenId === undefined) return fail(reply, 400, "device_token_required");
+    store.revokeDeviceToken(req.member.id, req.deviceTokenId);
+    return { ok: true };
+  });
+
   app.get("/api/me/device-tokens", async (req) => ({ tokens: store.deviceTokens(req.member.id) }));
 
   app.delete("/api/me/device-tokens/:id", async (req, reply) => {

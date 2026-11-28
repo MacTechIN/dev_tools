@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Planning documents live at the repository root and in `docs/`. Product code lives in `webapp/`, which builds and deploys on its own. Development is in phase 1 of `development_plan.md` (see its "진행 현황" table for what is done and what remains).
 
-`docs/decisions.md` is the source of truth for what is decided (D-xx), which tools were chosen (T-xx), and what is still open (O-xx). Check it before making a choice that a decision covers, and confirm with the user before settling anything listed as open. D-26 (release automation) is recorded but awaits the user's final review.
+`docs/decisions.md` is the source of truth for what is decided (D-xx), which tools were chosen (T-xx), and what is still open (O-xx). Check it before making a choice that a decision covers, and confirm with the user before settling anything listed as open. D-26 (release automation) is confirmed; the first cloud storage and mail provider is still open and will be confirmed once chosen.
 
 Keep `AGENTS.md` identical in substance to this file.
 
@@ -22,9 +22,10 @@ npm test                  # all workspaces
 npm test -w @devtools/server -- auth              # one test file (name filter)
 npm test -w @devtools/server -- -t "REQ-ADM-008"  # tests for one requirement
 npm run typecheck
-npm run build             # web first, then server (tsup)
+npm run build             # web, then the devtools CLI bundle, then server (tsup)
 npm start                 # runs apps/server/dist/index.js, also serves the built web
 PASSWORD=<admin pw> npm run sample-events   # fills the dashboard with sample activity
+node packages/cli/dist/devtools.mjs connect --server http://localhost:4100   # connect this machine's AI tools
 docker compose up -d --build
 ```
 
@@ -52,11 +53,13 @@ Invariants that shape the design:
 
 - `packages/shared` — the common event format as zod schemas (`events.ts`), the status derivation rules (`status.ts`), and types shared by server and web. It ships TypeScript source; the server bundles it with tsup, and Vite/Vitest read it directly.
 - `apps/server` — Fastify + better-sqlite3 (hand-written SQL, migrations in `db.ts` keyed on `user_version`). `store.ts` holds all database access and is an EventEmitter: every `addChange` appends to the `changes` table and emits to open SSE streams. `app.ts` wires auth in one `preHandler` hook using three route sets (public, device-token-allowed, allowed-before-password-change); a new route is login-protected by default and unreachable with a device token unless added to `DEVICE_ALLOWED`.
+- `packages/adapters` — pure functions converting each AI tool's hook payload into common events, plus real hook payloads recorded from each tool version under `<tool>/fixtures/`. No I/O.
+- `packages/cli` — the `devtools` command (`connect`, `disconnect`, `status`, and `hook`, which the AI tools' command hooks run). It does all file, git and network work, bundles into one file (`dist/devtools.mjs`), and the server serves it at `/devtools.mjs`. A hook call only appends to a local queue and spawns a detached `flush`; it never waits on the network, never prints, and always exits 0.
 - `apps/web` — React without a router. `live.ts` loads `/api/snapshot` once and then applies `member`/`feed` changes from `/api/stream` (SSE, resumed with `Last-Event-ID`). All UI text is in `strings.ts`.
-- Events: adapters (not built yet) convert each tool's hook output into the common format and POST to `/api/events` with a device token. The schema strips unknown keys, which is what keeps prompt and code bodies out of the database; do not loosen it.
+- Events: the conversion happens on the developer's machine (D-28), because the tools' hook payloads contain prompt text, file contents and replies. Adapters must emit only paths, categories and ids; the server schema also strips unknown keys as a second guard. Do not loosen either. Claude Code hooks go in the project's `.claude/settings.local.json`; Codex hooks go in the user's `~/.codex/hooks.json` (Codex has no personal per-project file) and the hook ignores unconnected projects. Never write Codex's hook trust state for the user.
 - The status shown for a work item is derived from two axes (implementation status, ownership status) and never stored.
 
-`docs/tech_design.md` describes the full target design; its section 18 lists what is implemented, and section 19 lists facts about each AI tool's hook/MCP behaviour that must be verified against the real tool before building adapters.
+`docs/tech_design.md` describes the full target design; its section 18 lists what is implemented, and section 19 lists what has and has not been verified against the real AI tools (Codex tool-event payloads are still unverified).
 
 ## Documents
 

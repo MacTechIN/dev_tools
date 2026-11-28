@@ -5,6 +5,8 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
+COPY packages/adapters/package.json packages/adapters/
+COPY packages/cli/package.json packages/cli/
 RUN npm ci
 COPY . .
 RUN npm run build && npm prune --omit=dev
@@ -18,6 +20,7 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/apps/server/package.json apps/server/
 COPY --from=build /app/apps/server/dist apps/server/dist
 COPY --from=build /app/apps/web/dist apps/web/dist
+COPY --from=build /app/packages/cli/dist packages/cli/dist
 RUN mkdir -p /data && chown node:node /data
 VOLUME /data
 EXPOSE 4100

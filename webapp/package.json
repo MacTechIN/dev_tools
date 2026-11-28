@@ -3,12 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "engines": { "node": ">=22" },
-  "workspaces": ["packages/*", "apps/*"],
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev:server": "npm run dev -w @devtools/server",
     "dev:web": "npm run dev -w @devtools/web",
-    "build": "npm run build -w @devtools/web && npm run build -w @devtools/server",
+    "build": "npm run build -w @devtools/web && npm run build -w @devtools/cli && npm run build -w @devtools/server",
     "start": "node apps/server/dist/index.js",
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",

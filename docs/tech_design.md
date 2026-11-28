@@ -3,7 +3,7 @@
 - 상태: 초안 (2026-11-26)
 - 근거: `dev_tools_definition.md`, `docs/requirements.md`, `docs/decisions.md`, `research.md`
 
-> 이 문서는 구현 전에 쓴 설계다. 각 AI 개발툴의 hook 설정 형식과 이벤트 이름은 `research.md`의 조사 내용에 기대고 있으며, 19장의 항목은 구현할 때 실제 도구 버전에서 다시 확인해야 한다.
+> 이 문서는 구현 전에 쓴 설계에서 출발했다. 9장(어댑터)은 실제 도구에서 확인한 내용으로 고쳤다. 아직 확인하지 못한 항목은 19장에 있다.
 
 ## 1. 전체 구성
 
@@ -77,8 +77,8 @@ dev_tools/
 │   │   └── web/             Dev_Dashboard 화면
 │   ├── packages/
 │   │   ├── shared/          공통 이벤트 형식, 타입, 상태 계산 규칙
-│   │   ├── adapters/        도구별 어댑터 (claude-code, codex, ...)
-│   │   └── cli/             devtools 명령 (connect, release)
+│   │   ├── adapters/        도구별 변환 함수와 실제 도구에서 받은 표본 (claude-code, codex, ...)
+│   │   └── cli/             devtools 명령 (connect, disconnect, status, hook. release는 6단계)
 │   ├── spec/                dev_tools 자체의 스펙 (요구사항)
 │   ├── eval/                갭 탐지 평가셋과 측정 스크립트
 │   ├── Dockerfile, docker-compose.yml
@@ -87,9 +87,9 @@ dev_tools/
 └── (루트 문서들)
 ```
 
-제품 코드는 모두 `webapp/` 안에 있고 그 폴더만으로 빌드하고 배포한다(D-27). `adapters`, `cli`, `spec`, `eval`은 아직 만들지 않았다.
+제품 코드는 모두 `webapp/` 안에 있고 그 폴더만으로 빌드하고 배포한다(D-27). `spec`, `eval`은 아직 만들지 않았다.
 
-서버와 화면은 `packages/shared`의 타입만 공유한다. 어댑터는 서버 코드를 참조하지 않는다(REQ-NFR-006).
+서버와 화면은 `packages/shared`의 타입만 공유한다. 어댑터와 `cli`는 서버 코드를 참조하지 않는다(REQ-NFR-006). `adapters`는 입출력이 없는 변환 함수만 두고, 파일·git·네트워크는 `cli`가 맡는다. `cli`는 빌드하면 의존성을 모두 묶은 파일 하나(`dist/devtools.mjs`)가 되고, 서버가 이 파일을 내려준다.
 
 ## 4. 공통 이벤트 형식
 
@@ -217,6 +217,8 @@ dev_tools/
 | POST | `/api/logout` | 로그아웃 |
 | POST | `/api/device-tokens` | 연결 명령용. ID와 비밀번호로 컴퓨터용 토큰 발급 |
 | GET, DELETE | `/api/me/device-tokens` | 내 컴퓨터용 토큰 목록과 끊기 |
+| DELETE | `/api/device-tokens/self` | 연결 해제 명령용. 요청에 쓴 컴퓨터용 토큰을 폐기 |
+| GET | `/devtools.mjs` | 연결 명령 파일 내려받기 (로그인 없이. 비밀 값 없음) |
 | PUT | `/api/me/password` | 비밀번호 바꾸기 |
 | GET, POST | `/api/members` | 팀원 목록, 추가 (관리자) |
 | PATCH | `/api/members/:id` | 역할 변경, 쉬게 하기, 임시 비밀번호 발급 (관리자) |
@@ -252,31 +254,44 @@ dev_tools/
 
 ## 9. 어댑터
 
+두 도구 모두 command hook이 `devtools hook <도구>`를 실행하고, 변환은 개발자 컴퓨터에서 한다(D-28). 도구가 hook에 넘기는 JSON에는 프롬프트 원문, 파일 내용, AI의 마지막 응답이 들어 있다(Claude Code 2.1.332에서 확인). 이것을 서버로 그대로 보내면 공통 형식이 걸러 주더라도 원문이 컴퓨터 밖으로 나간다. 그래서 서버 쪽 변환 경로는 두지 않는다.
+
 | | Claude Code | Codex CLI |
 |---|---|---|
-| 수집 방식 | hook의 HTTP 전송을 수집 API의 변환 경로로 보냄 | command hook이 어댑터 스크립트를 실행 |
-| 설정 위치 | 프로젝트의 `.claude/settings.json` | 프로젝트의 `.codex/hooks.json` |
+| 확인한 버전 | 2.1.332 (모든 이벤트를 실제로 받음) | 0.166.0 (세션 시작·종료와 지시는 실제로 받음. 도구 이벤트는 내장 스키마 기준 **[미확인]**) |
+| 설정 위치 | 프로젝트의 `.claude/settings.local.json` (개인 파일. git에 올리지 않게 `.git/info/exclude`에 넣음) | 사용자의 `~/.codex/hooks.json` (`CODEX_HOME`을 따름) |
 | 세션 시작·종료 | `SessionStart`, `SessionEnd` | `SessionStart`, `SessionEnd` |
-| 지시와 응답 | `UserPromptSubmit`, `Stop` | `UserPromptSubmit`, `Stop` |
-| 파일 변경·명령 | `PostToolUse` | `PostToolUse` |
+| 지시와 응답 | `UserPromptSubmit` → `turn.start`, `Stop` → `turn.end` | `UserPromptSubmit`, `Stop`, `Interrupt` |
+| 입력을 기다림 | `Notification` → `session.idle` | `PermissionRequest` → `session.idle` |
+| 파일 변경 | `PostToolUse`의 `Write`, `Edit`, `MultiEdit`, `NotebookEdit` | 턴 시작과 끝의 `git status` 비교. `apply_patch` 본문이 오면 그 경로도 읽음 |
+| 명령 | `PostToolUse`·`PostToolUseFailure`의 `Bash` (실패 여부 포함) | `PostToolUse`에서 `tool_input.command`가 있을 때 |
 
-- Claude Code는 도구 고유의 JSON을 그대로 보내므로, 서버에 `/api/events/claude-code` 변환 경로를 두고 거기서 공통 형식으로 바꾼다.
-- Codex CLI는 스크립트가 공통 형식으로 바꿔 `/api/events`로 보낸다.
-- 어댑터는 짧은 제한 시간 안에 응답이 없으면 포기하고 항상 성공으로 끝난다(REQ-COL-011). 보내지 못한 이벤트는 로컬 파일에 쌓았다가 다음 실행 때 보낸다(REQ-COL-008).
-- git 정보는 어댑터가 이벤트를 보낼 때 현재 브랜치와 최신 커밋을 함께 읽어 붙인다. 별도의 git hook은 설치하지 않는다.
-- Kimi Code CLI와 Gemini CLI 어댑터는 4단계에서 같은 구조로 추가한다.
+- **Codex의 파일 변경**: Codex는 모든 동작을 하나의 일반 도구(`exec`)로 실행하기도 해서, 도구 이벤트만으로는 어떤 파일을 고쳤는지 알 수 없다. 그래서 턴 시작에 바뀐 파일들의 크기와 수정 시각을 적어 두고, 턴 끝에 다시 비교해 달라진 파일을 `file.change`로 보낸다.
+- **Codex의 설정 위치**: Codex에는 개인용 프로젝트 설정 파일이 없다. 프로젝트의 `.codex/hooks.json`에 넣으면 저장소를 통해 팀원 모두에게 퍼지므로 사용자 파일에 넣고, hook이 연결되지 않은 프로젝트의 호출을 무시한다.
+- **Codex의 hook 신뢰**: Codex는 새 hook을 실행하기 전에 사용자의 승인을 받는다(`config.toml`의 `hooks.state`에 해시로 기록). dev_tools는 이 승인을 대신하거나 건너뛰지 않는다. 연결 뒤 Codex를 열어 승인해야 기록이 시작된다.
+- **보내는 내용**: 명령은 문자열 대신 종류(테스트, 빌드, 기타)와 성공 여부만, 파일은 프로젝트 루트 기준 상대 경로만 보낸다. 프로젝트 밖의 경로는 버린다(REQ-COL-006).
+- **git 정보**: hook이 불릴 때마다 현재 브랜치와 HEAD를 읽어 이전 값과 비교한다. 브랜치가 바뀌면 `git.branch`, 같은 브랜치에서 HEAD가 바뀌고 작성자 이메일이 내 `user.email`과 같으면 `git.commit`을 만든다. 남이 만든 커밋(pull로 들어온 것)은 보내지 않는다. 커밋 이벤트의 ID는 해시라서 두 세션에서 봐도 한 번만 저장된다. 별도의 git hook은 설치하지 않는다(REQ-COL-005).
+- **느려지지 않게**: hook은 변환한 이벤트를 로컬 대기열 파일에 덧붙이고, 보내는 일은 따로 띄운 프로세스(`devtools flush`)에 맡긴 뒤 바로 끝난다. 네트워크를 기다리지 않고, 어떤 오류가 나도 성공으로 끝나며 아무것도 출력하지 않는다(일부 도구는 hook 출력을 대화에 넣는다). hook 명령 끝의 `|| :`는 Node.js가 없어도 도구의 hook이 실패하지 않게 한다(REQ-COL-011).
+- **대기열**: 보내기는 한 번에 하나만 돈다(잠금 파일). 보내는 동안 들어온 이벤트는 새 대기열 파일로 간다. 서버에 닿지 못하면 남은 것을 그대로 두었다가 다음 hook 때 다시 보낸다. 대기열이 5MB를 넘으면 새 이벤트를 버린다. 서버가 형식 오류(400)로 거절한 묶음은 버린다(REQ-COL-008).
+- Kimi Code CLI와 Gemini CLI 어댑터는 4단계에서 `webapp/packages/adapters`에 변환 함수를 더하는 것으로 추가한다. 서버는 고치지 않는다(REQ-NFR-006).
 
 ### 연결 명령
 
 ```
-devtools connect --server <주소>
+curl -fsSL -o devtools.mjs <주소>/devtools.mjs
+node devtools.mjs connect --server <주소>
 ```
 
-1. ID와 비밀번호를 물어 서버에 로그인하고, 그 컴퓨터용 토큰을 받아 사용자 설정 폴더에 저장한다. 비밀번호는 저장하지 않는다(REQ-ADM-012).
-2. 설치된 AI 개발툴을 찾아 hook 설정과 MCP 서버 설정을 넣는다. 기존 설정은 지우지 않고 덧붙인다.
-3. 시험 이벤트를 보내 연결을 확인한다.
+명령은 연결할 서버에서 내려받는다. 하나의 파일(약 31KB)이고 Node.js 22 말고는 필요한 것이 없다.
 
-`devtools disconnect`는 넣었던 설정만 되돌린다(REQ-ADM-005).
+1. ID와 비밀번호를 물어 서버에 로그인하고, 그 컴퓨터용 토큰을 받아 `~/.config/devtools/config.json`(권한 600)에 저장한다. 비밀번호는 저장하지 않는다(REQ-ADM-012). 이미 같은 서버의 토큰이 있고 유효하면 다시 묻지 않는다. 임시 비밀번호인 동안에는 토큰을 받을 수 없다.
+2. 자신을 `~/.config/devtools/bin/devtools.mjs`로 복사한다. hook은 이 경로를 실행하므로 내려받은 파일을 지워도 된다.
+3. PATH에서 `claude`, `codex`를 찾아(또는 `--tools`로 지정) 위 표의 위치에 hook을 넣는다. 기존 설정은 그대로 두고 덧붙이며, 다시 실행하면 자기 항목만 바꾼다. 자기 항목은 명령 앞의 `: devtools-hook=1;` 표시로 알아본다.
+4. 받은 토큰으로 `/api/me`를 불러 연결을 확인하고 이름을 보여 준다.
+
+`devtools disconnect`는 넣었던 hook만 지운다. 연결된 프로젝트가 하나도 남지 않으면 서버에 토큰 폐기를 요청하고(`DELETE /api/device-tokens/self`), 자신이 만든 파일을 지운다(REQ-ADM-005). `devtools status`는 연결 상태와 보내지 못한 기록 수를 보여 준다.
+
+MCP 서버 설정을 넣는 일은 MCP가 생기는 2단계에 연결 명령에 더한다.
 
 ## 10. 갭 탐지
 
@@ -413,7 +428,7 @@ dev_tools는 AI 개발툴을 실행하지 않고 hook으로 활동만 받으므�
 
 ## 18. 구현 현황
 
-2026-11-26 기준으로 `webapp/`에 만들어진 것과 아직 없는 것이다.
+2026-11-27 기준으로 `webapp/`에 만들어진 것과 아직 없는 것이다.
 
 | 설계의 장 | 상태 |
 |---|---|
@@ -421,9 +436,9 @@ dev_tools는 AI 개발툴을 실행하지 않고 hook으로 활동만 받으므�
 | 5. 데이터 모델 | 팀원, 컴퓨터용 토큰, 로그인, 세션, 이벤트, 변경 기록까지 구현됨. 요구사항 이후의 테이블은 없음 |
 | 5. 상태 계산 | 규칙과 테스트는 구현됨. 쓰는 화면은 아직 없음 |
 | 6. Claim | 없음 (2단계) |
-| 7. API | 로그인, 팀원, 컴퓨터용 토큰, 이벤트 수집, 스냅숏, 실시간 전송, 한마디가 구현됨 |
+| 7. API | 로그인, 팀원, 컴퓨터용 토큰(자기 폐기 포함), 이벤트 수집, 스냅숏, 실시간 전송, 한마디, 연결 명령 내려받기가 구현됨 |
 | 8. MCP | 없음 (2단계) |
-| 9. 어댑터와 연결 명령 | 없음 (1단계의 남은 일) |
+| 9. 어댑터와 연결 명령 | Claude Code, Codex CLI 어댑터와 `connect`, `disconnect`, `status`가 구현됨. Claude Code는 실제 세션의 활동이 서버까지 들어오는 것을 확인함. Codex는 실제 도구 이벤트 확인이 남음(19장). 테스트 실행 결과(`test.result`)는 2단계 |
 | 10~12. 갭 탐지, 파일 겹침, 대화방 | 없음 |
 | 14. 팀원과 인증 | 구현됨. 쉬게 할 때 맡은 일을 푸는 부분은 claim이 생긴 뒤 |
 | 15. 출시와 전달 | 없음 (6~7단계) |
@@ -431,13 +446,15 @@ dev_tools는 AI 개발툴을 실행하지 않고 hook으로 활동만 받으므�
 
 ## 19. 구현할 때 확인할 것
 
-| 항목 | 확인 시점 |
-|---|---|
-| Claude Code의 HTTP hook 설정 형식과 각 이벤트의 JSON 필드 | 1단계 시작 |
-| Codex CLI의 hook 설정 형식, 프로젝트 단위 hook이 동작하는 조건 | 1단계 시작 |
-| 두 도구에서 원격(HTTP) MCP 서버를 연결하는 방법과 인증 헤더 지원 | 2단계 시작 |
-| 파일 변경과 명령 실행을 `PostToolUse`에서 구별해 읽을 수 있는지 | 1단계 시작 |
-| 테스트 결과를 hook에서 얻을 수 있는 범위 | 2단계 시작 |
-| 기업 환경에서 HTTP hook 주소가 허용 목록으로 막히는 경우의 우회 | 1단계 |
-| Kimi Code CLI와 Antigravity CLI의 hook 지원 범위 | 4단계 시작 |
-| Orca의 인증 방식(D-23의 근거)을 공식 문서에서 확인 | 0단계 |
+| 항목 | 확인 시점 | 결과 |
+|---|---|---|
+| Claude Code의 hook 설정 형식과 각 이벤트의 JSON 필드 | 1단계 시작 | 확인함 (2.1.332). 표본: `webapp/packages/adapters/claude-code/fixtures/` |
+| Codex CLI의 hook 설정 형식, 프로젝트 단위 hook이 동작하는 조건 | 1단계 시작 | 확인함 (0.166.0). 형식은 Claude Code와 같다. 프로젝트의 `.codex/hooks.json`도 읽지만 모든 hook은 사용자가 신뢰를 승인해야 돈다. `SessionEnd`와 `Interrupt`의 제한 시간은 3초로 줄어든다 |
+| 파일 변경과 명령 실행을 `PostToolUse`에서 구별해 읽을 수 있는지 | 1단계 시작 | Claude Code는 됨(`tool_name`). Codex는 일반 도구(`exec`)로 실행하면 안 됨 → git 비교로 대신함 |
+| Codex의 `PostToolUse`, `Stop`, `PermissionRequest` 실제 내용 | 1단계 | **[미확인]** Codex 사용 한도에 걸려 받지 못함(2026-12-02 이후 가능). 지금은 내장 스키마(`codex/fixtures/schemas-0.166.0/`) 기준 |
+| Codex의 hook 신뢰 승인이 화면에서 어떻게 보이는지 | 1단계 | **[미확인]** |
+| 두 도구에서 원격(HTTP) MCP 서버를 연결하는 방법과 인증 헤더 지원 | 2단계 시작 | |
+| 테스트 결과를 hook에서 얻을 수 있는 범위 | 2단계 시작 | |
+| 기업 환경에서 HTTP hook 주소가 허용 목록으로 막히는 경우의 우회 | 1단계 | 해당 없음. HTTP hook을 쓰지 않음(D-28) |
+| Kimi Code CLI와 Antigravity CLI의 hook 지원 범위 | 4단계 시작 | |
+| Orca의 인증 방식(D-23의 근거)을 공식 문서에서 확인 | 0단계 | 이 컴퓨터의 Orca 설정에서 Orca도 각 도구의 command hook으로 활동을 받는 것을 확인함. 인증은 각 도구가 스스로 함 |

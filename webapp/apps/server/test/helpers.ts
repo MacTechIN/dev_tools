@@ -6,13 +6,14 @@ import type { Store } from "../src/store";
 
 export const ADMIN = { loginId: "admin", name: "관리자", password: "admin-password" };
 
-export function testConfig(dbPath = ":memory:"): Config {
+export function testConfig(dbPath = ":memory:", cliBundle = "/nonexistent/devtools.mjs"): Config {
   return {
     port: 0,
     host: "127.0.0.1",
     dbPath,
     cookieSecure: false,
     webDist: "/nonexistent",
+    cliBundle,
     sessionDays: 30,
     admin: ADMIN,
   };
@@ -24,8 +25,8 @@ export interface TestApp {
   close(): Promise<void>;
 }
 
-export async function startApp(dbPath = ":memory:"): Promise<TestApp> {
-  const config = testConfig(dbPath);
+export async function startApp(dbPath = ":memory:", cliBundle?: string): Promise<TestApp> {
+  const config = testConfig(dbPath, cliBundle);
   const db = openDb(config.dbPath);
   const { app, store } = await buildApp({ db, config, memberChangeDelayMs: 0 });
   await ensureAdmin(store, config);
